@@ -28,11 +28,10 @@
     .pedido-chip{border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:8px;background:#f8fafc;position:relative;transition:0.2s}.pedido-chip:hover{background:#fff}.btn-icon-group{display:flex;gap:6px;margin-top:6px;justify-content:flex-end}.btn-icon-group button{background:none;border:none;cursor:pointer;font-size:14px;padding:4px 8px;border-radius:6px;transition:0.2s}.btn-icon-group button.btn-remove{color:var(--red);background:#fee2e2}.btn-icon-group button.btn-remove:hover{background:#fecaca}.btn-icon-group button.btn-move{color:var(--blue);background:#e6f0ff}.btn-icon-group button.btn-move:hover{background:#cce4ff}
     .decision-box{margin-top:10px;padding:10px;background:#f8fafc;border-left:4px solid var(--blue);border-radius:10px;font-size:13px}.critical-item{background:#fff3e0;border-left:4px solid var(--orange);padding:8px;margin-top:8px;border-radius:8px}
     .modal{display:none;position:fixed;z-index:1000;inset:0;overflow:auto;background-color:rgba(0,0,0,.5)}.modal-content{background-color:#fefefe;margin:5% auto;padding:20px;border:1px solid #888;width:80%;max-width:900px;border-radius:16px;max-height:80vh;overflow-y:auto}.close{color:#aaa;float:right;font-size:28px;font-weight:bold;cursor:pointer}.close:hover{color:black}
-    /* Estilo para a barra de ocupação */
     .ocupacao-box { margin-top: 15px; margin-bottom: 15px; }
     .ocupacao-label { font-size: 13px; margin-bottom: 5px; color: #475569; font-weight: 600; }
     .ocupacao-bar { width: 100%; height: 20px; background: #e2e8f0; border-radius: 10px; overflow: hidden; }
-    .ocupacao-fill { height: 100%; background: linear-gradient(90deg, #22c55e, #16a34a); border-radius: 10px; transition: width 0.3s; }
+    .ocupacao-fill { height: 100%; border-radius: 10px; transition: width 0.3s; }
     .ocupacao-text { font-size: 13px; margin-top: 5px; font-weight: bold; color: #0f172a; text-align: right; }
     @media (max-width:1200px){.metrics{grid-template-columns:repeat(3,minmax(0,1fr))}.grid-5,.grid-4,.grid-3{grid-template-columns:repeat(2,minmax(0,1fr))}.map-side-grid{grid-template-columns:1fr}}
     @media (max-width:768px){.app{flex-direction:column}.sidebar{width:100%;height:auto;position:relative}.metrics,.grid-2,.grid-3,.grid-4,.grid-5,.grid-6{grid-template-columns:1fr}}
@@ -247,19 +246,65 @@ function identificarCorredor(uf,cidade) {
   return MAPA_UF[u] || "OUTROS";
 }
 
+// ========== NOVA LÓGICA DE ESCOLHA DE VEÍCULO POR FAIXA DE CUBAGEM ==========
+function definirTipoVeiculoPorVolume(m3) {
+  if (m3 <= 3) return "FIORINO";
+  if (m3 <= 7) return "VAN";
+  if (m3 <= 19) return "VUC";
+  if (m3 <= 30) return "TOCO";
+  if (m3 <= 45) return "TRUCK";
+  return "CARRETA";
+}
+
+function tipoDoVeiculo(nome) {
+  const n = normalizarTexto(nome).toLowerCase();
+  if (n.includes("fiorino")) return "FIORINO";
+  if (n.includes("van")) return "VAN";
+  if (n.includes("vuc")) return "VUC";
+  if (n.includes("toco")) return "TOCO";
+  if (n.includes("truck")) return "TRUCK";
+  if (n.includes("carreta")) return "CARRETA";
+  return "OUTRO";
+}
+
 function escolherVeiculoParaCarga(pedidosDaCarga) {
   if (!pedidosDaCarga.length) return null;
+
   const pesoTotal = pedidosDaCarga.reduce((s,p)=>s+p.pesoTotal,0);
   const volumeTotal = pedidosDaCarga.reduce((s,p)=>s+p.volumeTotal,0);
   const notasTotal = pedidosDaCarga.reduce((s,p)=>s+p.numNotas,0);
   const maiorItem = getMaiorItemDaCarga(pedidosDaCarga);
-  const ordenados = [...vehicles].sort((a,b)=> a.volumeMax - b.volumeMax || a.pesoMax - b.pesoMax);
+
+  // 1. Define o tipo ideal pela cubagem
+  let tipoIdeal = definirTipoVeiculoPorVolume(volumeTotal);
+
+  // 2. Filtra veículos do tipo ideal
+  let candidatos = vehicles.filter(v => tipoDoVeiculo(v.nome) === tipoIdeal);
+
+  // 3. Se não houver veículo desse tipo, fallback para todos
+  if (!candidatos.length) candidatos = [...vehicles];
+
+  // 4. Tenta usar um veículo do tipo ideal que atenda todas as restrições
+  for (let v of candidatos) {
+    if (!cabeNoVeiculoPorDimensao(maiorItem, v)) continue;
+    if (pesoTotal <= v.pesoMax && volumeTotal <= v.volumeMax && notasTotal <= v.notasMax) {
+      // Guarda a regra aplicada para exibição
+      return { veiculo: v, regra: "cubagem" };
+    }
+  }
+
+  // 5. Se não deu certo, quebra a regra e tenta qualquer veículo (ordem crescente)
+  const ordenados = [...vehicles].sort((a,b)=> a.volumeMax - b.volumeMax);
   for (let v of ordenados) {
     if (!cabeNoVeiculoPorDimensao(maiorItem, v)) continue;
-    if (pesoTotal <= v.pesoMax && volumeTotal <= v.volumeMax && notasTotal <= v.notasMax) return v;
+    if (pesoTotal <= v.pesoMax && volumeTotal <= v.volumeMax && notasTotal <= v.notasMax) {
+      return { veiculo: v, regra: "excecao (dimensão)" };
+    }
   }
+
   return null;
 }
+// ============================================================================
 
 function podeConsolidar(p1, p2) {
   if (p1.grupoConsolidado === "LITORAL_SP" || p2.grupoConsolidado === "LITORAL_SP") {
@@ -414,7 +459,9 @@ function renderOperacaoLeveList() {
 
 function obterChaveAgrupamento(p) { const uf = normalizarTexto(p.uf).toUpperCase(), cidade = normalizarTexto(p.cidade).toUpperCase(), cep = (p.cep || "").replace(/\D/g, ""); const cidadesLitoral = ["SANTOS","GUARUJA","SAO VICENTE","PRAIA GRANDE"]; if (uf === "SP" && cidadesLitoral.includes(cidade)) return "LITORAL_SP"; if (uf === "SP" && cep.length >= 5 && isCapitalOuGrandeSP(cep)) return "SP_CAPITAL"; if (uf === "SP") { const regiao = definirRegiaoSP(cidade); if (regiao && REGIOES_SP[regiao]) { const integracao = REGIOES_SP[regiao].integracaoCorredor; return integracao || regiao; } return "SP_INTERIOR"; } const corredor = identificarCorredor(uf, cidade); return corredor || "OUTROS"; }
 
-function gerarFatorDecisorio(pedidosDaCarga, veiculo, grupoChave) {
+function gerarFatorDecisorio(pedidosDaCarga, veiculoObj, grupoChave) {
+  const veiculo = veiculoObj.veiculo;
+  const regraAplicada = veiculoObj.regra;
   const maiorItem = getMaiorItemDaCarga(pedidosDaCarga);
   const peso = pedidosDaCarga.reduce((s,p)=>s+p.pesoTotal,0);
   const m3 = pedidosDaCarga.reduce((s,p)=>s+p.volumeTotal,0);
@@ -437,7 +484,7 @@ function gerarFatorDecisorio(pedidosDaCarga, veiculo, grupoChave) {
     motivoPrincipal = `quantidade de ${notas} notas fiscais (${Math.round(pctNotas)}% da capacidade)`;
   }
   const motivoDimensao = `Maior item ${formatNumber(maiorItem.altura)} x ${formatNumber(maiorItem.largura)} x ${formatNumber(maiorItem.profundidade)} m → veículo mínimo ${veiculo?.nome||"não encontrado"}`;
-  const textoFinal = `Veículo escolhido devido à ${motivoPrincipal}. ${motivoDimensao}`;
+  const textoFinal = `Veículo escolhido devido à ${motivoPrincipal}. ${motivoDimensao} (Regra: ${regraAplicada === "cubagem" ? "faixa de cubagem" : "exceção por dimensão"})`;
   return {
     maiorItem,
     motivoDimensao: textoFinal,
@@ -507,7 +554,8 @@ async function montarRotasInteligentes(pedidosBase) {
       const fecharLote = () => {
         if (!lote.length) return; 
         const loteOtimizado = otimizarOrdemRota(lote, depotCoords);
-        const veiculo = escolherVeiculoParaCarga(loteOtimizado);
+        const veiculoObj = escolherVeiculoParaCarga(loteOtimizado);
+        const veiculo = veiculoObj ? veiculoObj.veiculo : null;
         const isHeavySolo = usarHold && loteOtimizado.length === 1 && 
                             loteOtimizado[0].pesoTotal > 1000 && 
                             !loteOtimizado[0].exclusivo;
@@ -516,7 +564,7 @@ async function montarRotasInteligentes(pedidosBase) {
         } else if (isHeavySolo) {
           loteOtimizado.forEach(p => holdList.push({ ...p, motivo: "Peso > 1000kg sem consolidação → aguardar nova rodada" }));
         } else {
-          const decisao = gerarFatorDecisorio(loteOtimizado, veiculo, chave);
+          const decisao = gerarFatorDecisorio(loteOtimizado, veiculoObj, chave);
           rotas.push({ 
             id: crypto.randomUUID?.() || Date.now()+"_"+Math.random(), 
             corredor: chave, 
@@ -527,7 +575,8 @@ async function montarRotasInteligentes(pedidosBase) {
             pesoTotal: loteOtimizado.reduce((s,p)=>s+p.pesoTotal,0), 
             volumeTotal: loteOtimizado.reduce((s,p)=>s+p.volumeTotal,0), 
             numNotas: loteOtimizado.reduce((s,p)=>s+p.numNotas,0), 
-            veiculo, 
+            veiculo: veiculo,
+            veiculoObj: veiculoObj,
             distanciaKm: 0, 
             custoEstimado: 0, 
             exclusivo: loteOtimizado.some(p => p.exclusivo), 
@@ -599,24 +648,27 @@ function focusRouteOnMap(rotaId) {
   map.fitBounds(bounds);
 }
 
-// Função para calcular ocupação (percentual de volume)
+function corOcupacao(pct) {
+  if (pct < 50) return "#ef4444";
+  if (pct < 80) return "#f59e0b";
+  return "#22c55e";
+}
 function calcularOcupacao(rota) {
   if (!rota.veiculo || rota.veiculo.volumeMax <= 0) return 0;
-  const volumeTotal = rota.volumeTotal || 0;
-  return Math.min((volumeTotal / rota.veiculo.volumeMax) * 100, 100);
+  return Math.min((rota.volumeTotal / rota.veiculo.volumeMax) * 100, 100);
 }
 
 function verDetalheRota(rotaId) { 
   const rota = ultimoResultado?.rotas?.find(r => r.id === rotaId); 
   if (!rota) return; 
   const ocupacao = calcularOcupacao(rota);
+  const cor = corOcupacao(ocupacao);
   let html = `<h3>Detalhes da Rota</h3><p><strong>Corredor:</strong> ${rota.nomeCorredor} (${rota.rodovia})</p><p><strong>Data de Entrega:</strong> ${rota.dataEntrega}</p><p><strong>Veículo:</strong> ${rota.veiculo?.nome} (${formatNumber(rota.veiculo?.volumeMax)} m³, ${formatNumber(rota.veiculo?.pesoMax)} kg)</p>`;
-  // Barra de ocupação
   html += `
     <div class="ocupacao-box">
       <div class="ocupacao-label">📦 Ocupação do veículo (volume)</div>
       <div class="ocupacao-bar">
-        <div class="ocupacao-fill" style="width: ${ocupacao}%"></div>
+        <div class="ocupacao-fill" style="width: ${ocupacao}%; background: ${cor};"></div>
       </div>
       <div class="ocupacao-text">${ocupacao.toFixed(0)}% (${formatNumber(rota.volumeTotal)} m³ / ${formatNumber(rota.veiculo?.volumeMax)} m³)</div>
     </div>
@@ -659,10 +711,11 @@ function removerPedidoDaRota(rotaId, pedidoOs) {
   if (rota.pedidos.length === 0) {
     ultimoResultado.rotas.splice(rotaIndex, 1);
   } else {
-    const novoVeiculo = escolherVeiculoParaCarga(rota.pedidos);
-    if (novoVeiculo) {
-      rota.veiculo = novoVeiculo;
-      const novaDecisao = gerarFatorDecisorio(rota.pedidos, novoVeiculo, rota.grupoChave);
+    const veiculoObj = escolherVeiculoParaCarga(rota.pedidos);
+    if (veiculoObj) {
+      rota.veiculo = veiculoObj.veiculo;
+      rota.veiculoObj = veiculoObj;
+      const novaDecisao = gerarFatorDecisorio(rota.pedidos, veiculoObj, rota.grupoChave);
       rota.fatorDecisorio = novaDecisao.motivoDimensao;
       rota.decisao = novaDecisao;
       rota.maiorItem = novaDecisao.maiorItem;
@@ -698,10 +751,11 @@ function moverPedidoParaRota(rotaOrigemId, pedidoOs, rotaDestinoId) {
     rotaOrigem.pesoTotal = rotaOrigem.pedidos.reduce((s,p)=>s+p.pesoTotal,0);
     rotaOrigem.volumeTotal = rotaOrigem.pedidos.reduce((s,p)=>s+p.volumeTotal,0);
     rotaOrigem.numNotas = rotaOrigem.pedidos.reduce((s,p)=>s+p.numNotas,0);
-    const novoVeiculoOrigem = escolherVeiculoParaCarga(rotaOrigem.pedidos);
-    if (novoVeiculoOrigem) {
-      rotaOrigem.veiculo = novoVeiculoOrigem;
-      const novaDecisao = gerarFatorDecisorio(rotaOrigem.pedidos, novoVeiculoOrigem, rotaOrigem.grupoChave);
+    const veiculoObj = escolherVeiculoParaCarga(rotaOrigem.pedidos);
+    if (veiculoObj) {
+      rotaOrigem.veiculo = veiculoObj.veiculo;
+      rotaOrigem.veiculoObj = veiculoObj;
+      const novaDecisao = gerarFatorDecisorio(rotaOrigem.pedidos, veiculoObj, rotaOrigem.grupoChave);
       rotaOrigem.fatorDecisorio = novaDecisao.motivoDimensao;
       rotaOrigem.decisao = novaDecisao;
       rotaOrigem.maiorItem = novaDecisao.maiorItem;
@@ -715,10 +769,11 @@ function moverPedidoParaRota(rotaOrigemId, pedidoOs, rotaDestinoId) {
   rotaDestino.pesoTotal = rotaDestino.pedidos.reduce((s,p)=>s+p.pesoTotal,0);
   rotaDestino.volumeTotal = rotaDestino.pedidos.reduce((s,p)=>s+p.volumeTotal,0);
   rotaDestino.numNotas = rotaDestino.pedidos.reduce((s,p)=>s+p.numNotas,0);
-  const novoVeiculoDestino = escolherVeiculoParaCarga(rotaDestino.pedidos);
-  if (novoVeiculoDestino) {
-    rotaDestino.veiculo = novoVeiculoDestino;
-    const novaDecisao = gerarFatorDecisorio(rotaDestino.pedidos, novoVeiculoDestino, rotaDestino.grupoChave);
+  const veiculoObjDest = escolherVeiculoParaCarga(rotaDestino.pedidos);
+  if (veiculoObjDest) {
+    rotaDestino.veiculo = veiculoObjDest.veiculo;
+    rotaDestino.veiculoObj = veiculoObjDest;
+    const novaDecisao = gerarFatorDecisorio(rotaDestino.pedidos, veiculoObjDest, rotaDestino.grupoChave);
     rotaDestino.fatorDecisorio = novaDecisao.motivoDimensao;
     rotaDestino.decisao = novaDecisao;
     rotaDestino.maiorItem = novaDecisao.maiorItem;
@@ -748,8 +803,8 @@ function moverAguardandoParaRota(pedidoOs, rotaId) {
     return;
   }
   const teste = [...rota.pedidos, pedido];
-  const veiculoTest = escolherVeiculoParaCarga(teste);
-  if (!veiculoTest) {
+  const veiculoObj = escolherVeiculoParaCarga(teste);
+  if (!veiculoObj) {
     alert("Não cabe na rota (capacidade de peso, volume ou notas excedida).");
     return;
   }
@@ -758,8 +813,9 @@ function moverAguardandoParaRota(pedidoOs, rotaId) {
   rota.pesoTotal = rota.pedidos.reduce((s,p)=>s+p.pesoTotal,0);
   rota.volumeTotal = rota.pedidos.reduce((s,p)=>s+p.volumeTotal,0);
   rota.numNotas = rota.pedidos.reduce((s,p)=>s+p.numNotas,0);
-  rota.veiculo = veiculoTest;
-  const novaDecisao = gerarFatorDecisorio(rota.pedidos, veiculoTest, rota.grupoChave);
+  rota.veiculo = veiculoObj.veiculo;
+  rota.veiculoObj = veiculoObj;
+  const novaDecisao = gerarFatorDecisorio(rota.pedidos, veiculoObj, rota.grupoChave);
   rota.fatorDecisorio = novaDecisao.motivoDimensao;
   rota.decisao = novaDecisao;
   rota.maiorItem = novaDecisao.maiorItem;
