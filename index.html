@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Frete PRO TMS - Consolidação Profissional</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <style>
     * { box-sizing: border-box; }
     :root{--bg:#dfe5ec;--sidebar:#071533;--sidebar2:#162748;--sidebar3:#22365f;--card:#f8fafc;--line:#e2e8f0;--text:#0f172a;--muted:#64748b;--blue:#2563eb;--green:#22c55e;--orange:#f59e0b;--red:#ef4444;--purple:#8b5cf6;}
@@ -29,6 +28,12 @@
     .pedido-chip{border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:8px;background:#f8fafc;position:relative;transition:0.2s}.pedido-chip:hover{background:#fff}.btn-icon-group{display:flex;gap:6px;margin-top:6px;justify-content:flex-end}.btn-icon-group button{background:none;border:none;cursor:pointer;font-size:14px;padding:4px 8px;border-radius:6px;transition:0.2s}.btn-icon-group button.btn-remove{color:var(--red);background:#fee2e2}.btn-icon-group button.btn-remove:hover{background:#fecaca}.btn-icon-group button.btn-move{color:var(--blue);background:#e6f0ff}.btn-icon-group button.btn-move:hover{background:#cce4ff}
     .decision-box{margin-top:10px;padding:10px;background:#f8fafc;border-left:4px solid var(--blue);border-radius:10px;font-size:13px}.critical-item{background:#fff3e0;border-left:4px solid var(--orange);padding:8px;margin-top:8px;border-radius:8px}
     .modal{display:none;position:fixed;z-index:1000;inset:0;overflow:auto;background-color:rgba(0,0,0,.5)}.modal-content{background-color:#fefefe;margin:5% auto;padding:20px;border:1px solid #888;width:80%;max-width:900px;border-radius:16px;max-height:80vh;overflow-y:auto}.close{color:#aaa;float:right;font-size:28px;font-weight:bold;cursor:pointer}.close:hover{color:black}
+    /* Estilo para a barra de ocupação */
+    .ocupacao-box { margin-top: 15px; margin-bottom: 15px; }
+    .ocupacao-label { font-size: 13px; margin-bottom: 5px; color: #475569; font-weight: 600; }
+    .ocupacao-bar { width: 100%; height: 20px; background: #e2e8f0; border-radius: 10px; overflow: hidden; }
+    .ocupacao-fill { height: 100%; background: linear-gradient(90deg, #22c55e, #16a34a); border-radius: 10px; transition: width 0.3s; }
+    .ocupacao-text { font-size: 13px; margin-top: 5px; font-weight: bold; color: #0f172a; text-align: right; }
     @media (max-width:1200px){.metrics{grid-template-columns:repeat(3,minmax(0,1fr))}.grid-5,.grid-4,.grid-3{grid-template-columns:repeat(2,minmax(0,1fr))}.map-side-grid{grid-template-columns:1fr}}
     @media (max-width:768px){.app{flex-direction:column}.sidebar{width:100%;height:auto;position:relative}.metrics,.grid-2,.grid-3,.grid-4,.grid-5,.grid-6{grid-template-columns:1fr}}
   </style>
@@ -186,7 +191,6 @@
   <div class="modal-content">
     <span class="close" onclick="document.getElementById('routeModal').style.display='none'">&times;</span>
     <div id="modalContent"></div>
-    <div id="viewer3d" style="width:100%; height:400px; margin-top:15px;"></div>
   </div>
 </div>
 
@@ -595,76 +599,29 @@ function focusRouteOnMap(rotaId) {
   map.fitBounds(bounds);
 }
 
-// Função 3D usando Three.js
-function renderCubagem3D(rota) {
-  const container = document.getElementById("viewer3d");
-  if (!container) return;
-
-  container.innerHTML = "";
-
-  const width = container.clientWidth;
-  const height = 400;
-
-  const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0xf1f5f9);
-
-  const camera = new THREE.PerspectiveCamera(75, width / height, 0.1, 1000);
-  const renderer = new THREE.WebGLRenderer({ antialias: true });
-
-  renderer.setSize(width, height);
-  container.appendChild(renderer.domElement);
-
-  // Caminhão (container wireframe)
-  const truck = new THREE.Mesh(
-    new THREE.BoxGeometry(10, 4, 4),
-    new THREE.MeshBasicMaterial({ wireframe: true, color: 0x334155 })
-  );
-  scene.add(truck);
-
-  // Caixas (itens)
-  let offsetX = -4;
-
-  rota.pedidos.forEach((pedido, index) => {
-    pedido.items.forEach((item, i) => {
-      // Dimensões mínimas para visualização
-      const largura = Math.max(item.largura || 0.5, 0.5);
-      const altura = Math.max(item.altura || 0.5, 0.5);
-      const profundidade = Math.max(item.profundidade || 0.5, 0.5);
-
-      const box = new THREE.Mesh(
-        new THREE.BoxGeometry(largura, altura, profundidade),
-        new THREE.MeshBasicMaterial({
-          color: new THREE.Color(`hsl(${(index * 60) % 360}, 70%, 50%)`)
-        })
-      );
-
-      box.position.set(offsetX, altura / 2 - 2, 0);
-      scene.add(box);
-
-      offsetX += largura + 0.2;
-
-      // Quebra de linha simples (pula para próxima linha se passar da borda)
-      if (offsetX > 4) offsetX = -4;
-    });
-  });
-
-  camera.position.z = 15;
-  camera.position.y = 5;
-  camera.lookAt(0, 0, 0);
-
-  function animate() {
-    requestAnimationFrame(animate);
-    truck.rotation.y += 0.002;
-    renderer.render(scene, camera);
-  }
-
-  animate();
+// Função para calcular ocupação (percentual de volume)
+function calcularOcupacao(rota) {
+  if (!rota.veiculo || rota.veiculo.volumeMax <= 0) return 0;
+  const volumeTotal = rota.volumeTotal || 0;
+  return Math.min((volumeTotal / rota.veiculo.volumeMax) * 100, 100);
 }
 
 function verDetalheRota(rotaId) { 
   const rota = ultimoResultado?.rotas?.find(r => r.id === rotaId); 
   if (!rota) return; 
-  let html = `<h3>Detalhes da Rota</h3><p><strong>Corredor:</strong> ${rota.nomeCorredor} (${rota.rodovia})</p><p><strong>Data de Entrega:</strong> ${rota.dataEntrega}</p><p><strong>Veículo:</strong> ${rota.veiculo?.nome} (${formatNumber(rota.veiculo?.volumeMax)} m³, ${formatNumber(rota.veiculo?.pesoMax)} kg)</p><p><strong>Fator Decisório:</strong> ${rota.fatorDecisorio}</p><div class="decision-box"><strong>Resumo decisório</strong><br>${rota.decisao?.motivoDimensao || "-"}<br>Corredor/Regra: ${rota.decisao?.corredor || "-"}<br>Regras aplicadas: ${(rota.decisao?.regrasAplicadas||[]).join(" | ")}<br>Observações: ${(rota.decisao?.observacoes||[]).join(" | ")}</div><p><strong>Totais:</strong> ${formatNumber(rota.pesoTotal)} kg, ${formatNumber(rota.volumeTotal)} m³, ${rota.numNotas} notas, ${formatNumber(rota.distanciaKm)} km, ${formatCurrency(rota.custoEstimado)}</p>`; 
+  const ocupacao = calcularOcupacao(rota);
+  let html = `<h3>Detalhes da Rota</h3><p><strong>Corredor:</strong> ${rota.nomeCorredor} (${rota.rodovia})</p><p><strong>Data de Entrega:</strong> ${rota.dataEntrega}</p><p><strong>Veículo:</strong> ${rota.veiculo?.nome} (${formatNumber(rota.veiculo?.volumeMax)} m³, ${formatNumber(rota.veiculo?.pesoMax)} kg)</p>`;
+  // Barra de ocupação
+  html += `
+    <div class="ocupacao-box">
+      <div class="ocupacao-label">📦 Ocupação do veículo (volume)</div>
+      <div class="ocupacao-bar">
+        <div class="ocupacao-fill" style="width: ${ocupacao}%"></div>
+      </div>
+      <div class="ocupacao-text">${ocupacao.toFixed(0)}% (${formatNumber(rota.volumeTotal)} m³ / ${formatNumber(rota.veiculo?.volumeMax)} m³)</div>
+    </div>
+  `;
+  html += `<p><strong>Fator Decisório:</strong> ${rota.fatorDecisorio}</p><div class="decision-box"><strong>Resumo decisório</strong><br>${rota.decisao?.motivoDimensao || "-"}<br>Corredor/Regra: ${rota.decisao?.corredor || "-"}<br>Regras aplicadas: ${(rota.decisao?.regrasAplicadas||[]).join(" | ")}<br>Observações: ${(rota.decisao?.observacoes||[]).join(" | ")}</div><p><strong>Totais:</strong> ${formatNumber(rota.pesoTotal)} kg, ${formatNumber(rota.volumeTotal)} m³, ${rota.numNotas} notas, ${formatNumber(rota.distanciaKm)} km, ${formatCurrency(rota.custoEstimado)}</p>`; 
   if (rota.itemCritico?.item) { const it = rota.itemCritico.item; html += `<div class="critical-item"><strong>🎯 Item crítico que definiu o veículo</strong><br>Código: ${it.codigo || '-'}<br>Descrição: ${it.descricao || '-'}<br>Dimensões: ${formatNumber(it.altura||0)} x ${formatNumber(it.largura||0)} x ${formatNumber(it.profundidade||0)} m<br>Peso: ${formatNumber(it.peso||0)} kg | Volume: ${formatNumber(it.volume||0)} m³</div>`; } 
   html += `<h4>Pedidos na rota:</h4>`; 
   for (let p of rota.pedidos) { 
@@ -685,10 +642,6 @@ function verDetalheRota(rotaId) {
   } 
   document.getElementById("modalContent").innerHTML = html; 
   document.getElementById("routeModal").style.display = "block";
-  // Inicia a visualização 3D após o modal ser aberto
-  setTimeout(() => {
-    renderCubagem3D(rota);
-  }, 100);
 }
 
 function removerPedidoDaRota(rotaId, pedidoOs) {
