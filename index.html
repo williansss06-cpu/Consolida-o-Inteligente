@@ -563,7 +563,7 @@ function definirTipoRota(distKm) {
   return distKm > 200 ? "TRANSFERENCIA" : "ENTREGA";
 }
 function calcularDiasViagem(distKm) {
-  const kmDia = 600;
+  const kmDia = 600; // padrão rodoviário
   return Math.ceil(distKm / kmDia);
 }
 
@@ -662,6 +662,7 @@ async function montarRotasInteligentes(pedidosBase) {
             const analise = decisaoDistanciaTempo(dist, tipoVeiculo);
             if (!analise.ok) { pode = false; break; }
           }
+          // Se for transferência, não quebra por distância/tempo
         }
         const teste = [...lote, p];
         const pesoTeste = teste.reduce((s,x)=>s+x.pesoTotal,0);
@@ -769,31 +770,14 @@ function renderMapControls() {
   }
 }
 
-// ==================== SUGESTÕES INTELIGENTES AGRUPADAS ====================
-function gerarSugestoesAgrupadas(rotas) {
-  const resumo = {};
-
+function gerarSugestoes(rotas) {
+  let sugestoes = [];
   rotas.forEach(r => {
-    const corredor = r.nomeCorredor;
-    if (!resumo[corredor]) {
-      resumo[corredor] = { total: 0, baixaOcupacao: 0, distanciaAlta: 0 };
-    }
-    resumo[corredor].total++;
-
     const ocupacao = (r.volumeTotal / r.veiculo.volumeMax) * 100;
-    if (ocupacao < 30) resumo[corredor].baixaOcupacao++;
-    if (r.distanciaKm > 300) resumo[corredor].distanciaAlta++;
+    if (ocupacao < 50) sugestoes.push(`Rota ${r.nomeCorredor}: baixa ocupação (${ocupacao.toFixed(0)}%)`);
+    if (ocupacao > 90) sugestoes.push(`Rota ${r.nomeCorredor}: risco de excesso (${ocupacao.toFixed(0)}%)`);
+    if (r.distanciaKm > 100) sugestoes.push(`Rota ${r.nomeCorredor}: distância alta (${r.distanciaKm.toFixed(0)} km)`);
   });
-
-  const sugestoes = [];
-  for (const [corredor, stats] of Object.entries(resumo)) {
-    if (stats.baixaOcupacao > 0) {
-      sugestoes.push(`Corredor ${corredor}: ${stats.baixaOcupacao} de ${stats.total} rotas com baixa ocupação (<30%)`);
-    }
-    if (stats.distanciaAlta > 0) {
-      sugestoes.push(`Corredor ${corredor}: ${stats.distanciaAlta} de ${stats.total} rotas com distância alta (>300 km) - considerar transferência`);
-    }
-  }
   return sugestoes;
 }
 
@@ -810,7 +794,7 @@ function renderResumo(){
     porCorredor.get(r.nomeCorredor).push(r); 
   } 
   let sugestoesHtml = "";
-  const sugestoes = gerarSugestoesAgrupadas(rotas);
+  const sugestoes = gerarSugestoes(rotas);
   if (sugestoes.length) {
     sugestoesHtml = `<div class="card"><h3>🧠 Sugestões Inteligentes</h3>${sugestoes.map(s => `<div class="inline-alert">${s}</div>`).join("")}</div>`;
   } else {
