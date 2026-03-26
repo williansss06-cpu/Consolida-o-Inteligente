@@ -458,16 +458,13 @@ function gerarFatorDecisorio(pedidosDaCarga, veiculoObj, grupoChave) {
   let complemento = "";
 
   if (regra === "cubagem") {
-    // A escolha foi pela regra de cubagem
     const faixa = REGRAS.cubagem.find(r => r.tipo === tipoIdeal);
     motivoPrincipal = `regra de cubagem (${tipoIdeal} – até ${faixa.max} m³)`;
     complemento = ` | Ocupação: ${pctVolume.toFixed(0)}% do volume (${formatNumber(m3)} m³ / ${formatNumber(veiculo.volumeMax)} m³)`;
   } else {
-    // Exceção: o veículo ideal não atendeu a alguma restrição
     if (motivoFalha) {
       motivoPrincipal = `exceção: ${motivoFalha}`;
     } else {
-      // fallback: destaca o recurso mais crítico
       if (pctVolume >= pctPeso && pctVolume >= pctNotas) {
         motivoPrincipal = `volume (${Math.round(pctVolume)}% da capacidade)`;
       } else if (pctPeso >= pctVolume && pctPeso >= pctNotas) {
@@ -562,6 +559,14 @@ function focusRouteOnMap(rotaId) {
 }
 
 // ==================== ROTEIRIZAÇÃO INTELIGENTE ====================
+function definirTipoRota(distKm) {
+  return distKm > 200 ? "TRANSFERENCIA" : "ENTREGA";
+}
+function calcularDiasViagem(distKm) {
+  const kmDia = 600;
+  return Math.ceil(distKm / kmDia);
+}
+
 function estimarTempoHoras(distKm, tipoVeiculo) {
   let velocidade = 60;
   if (tipoVeiculo === "FIORINO") velocidade = 50;
@@ -652,8 +657,11 @@ async function montarRotasInteligentes(pedidosBase) {
           const tipoVeiculo = definirTipoVeiculoPorVolume(
             lote.reduce((s,x)=>s+x.volumeTotal,0) + p.volumeTotal
           );
-          const analise = decisaoDistanciaTempo(dist, tipoVeiculo);
-          if (!analise.ok) { pode = false; break; }
+          const tipoRota = definirTipoRota(dist);
+          if (tipoRota === "ENTREGA") {
+            const analise = decisaoDistanciaTempo(dist, tipoVeiculo);
+            if (!analise.ok) { pode = false; break; }
+          }
         }
         const teste = [...lote, p];
         const pesoTeste = teste.reduce((s,x)=>s+x.pesoTotal,0);
@@ -761,14 +769,31 @@ function renderMapControls() {
   }
 }
 
-function gerarSugestoes(rotas) {
-  let sugestoes = [];
+// ==================== SUGESTÕES INTELIGENTES AGRUPADAS ====================
+function gerarSugestoesAgrupadas(rotas) {
+  const resumo = {};
+
   rotas.forEach(r => {
+    const corredor = r.nomeCorredor;
+    if (!resumo[corredor]) {
+      resumo[corredor] = { total: 0, baixaOcupacao: 0, distanciaAlta: 0 };
+    }
+    resumo[corredor].total++;
+
     const ocupacao = (r.volumeTotal / r.veiculo.volumeMax) * 100;
-    if (ocupacao < 50) sugestoes.push(`Rota ${r.nomeCorredor}: baixa ocupação (${ocupacao.toFixed(0)}%)`);
-    if (ocupacao > 90) sugestoes.push(`Rota ${r.nomeCorredor}: risco de excesso (${ocupacao.toFixed(0)}%)`);
-    if (r.distanciaKm > 100) sugestoes.push(`Rota ${r.nomeCorredor}: distância alta (${r.distanciaKm.toFixed(0)} km)`);
+    if (ocupacao < 30) resumo[corredor].baixaOcupacao++;
+    if (r.distanciaKm > 300) resumo[corredor].distanciaAlta++;
   });
+
+  const sugestoes = [];
+  for (const [corredor, stats] of Object.entries(resumo)) {
+    if (stats.baixaOcupacao > 0) {
+      sugestoes.push(`Corredor ${corredor}: ${stats.baixaOcupacao} de ${stats.total} rotas com baixa ocupação (<30%)`);
+    }
+    if (stats.distanciaAlta > 0) {
+      sugestoes.push(`Corredor ${corredor}: ${stats.distanciaAlta} de ${stats.total} rotas com distância alta (>300 km) - considerar transferência`);
+    }
+  }
   return sugestoes;
 }
 
@@ -785,7 +810,7 @@ function renderResumo(){
     porCorredor.get(r.nomeCorredor).push(r); 
   } 
   let sugestoesHtml = "";
-  const sugestoes = gerarSugestoes(rotas);
+  const sugestoes = gerarSugestoesAgrupadas(rotas);
   if (sugestoes.length) {
     sugestoesHtml = `<div class="card"><h3>🧠 Sugestões Inteligentes</h3>${sugestoes.map(s => `<div class="inline-alert">${s}</div>`).join("")}</div>`;
   } else {
@@ -799,7 +824,12 @@ function verDetalheRota(rotaId) {
   if (!rota) return; 
   const ocupacao = (rota.volumeTotal / rota.veiculo.volumeMax) * 100;
   const cor = ocupacao < 50 ? "#ef4444" : (ocupacao < 80 ? "#f59e0b" : "#22c55e");
+  const tipoRota = definirTipoRota(rota.distanciaKm);
+  const dias = calcularDiasViagem(rota.distanciaKm);
   let html = `<h3>Detalhes da Rota</h3><p><strong>Corredor:</strong> ${rota.nomeCorredor} (${rota.rodovia})</p><p><strong>Data de Entrega:</strong> ${rota.dataEntrega}</p><p><strong>Veículo:</strong> ${rota.veiculo?.nome} (${formatNumber(rota.veiculo?.volumeMax)} m³, ${formatNumber(rota.veiculo?.pesoMax)} kg)</p>`;
+  html += `<p><strong>Tipo de rota:</strong> <span class="pill ${tipoRota === 'TRANSFERENCIA' ? 'pill-purple' : 'pill-green'}">${tipoRota === 'TRANSFERENCIA' ? '🚚 Transferência' : '🚛 Entrega'}</span>`;
+  if (tipoRota === 'TRANSFERENCIA') html += ` | 📅 Tempo estimado: ${dias} dia(s) de viagem`;
+  html += `</p>`;
   html += `
     <div class="ocupacao-box">
       <div class="ocupacao-label">📦 Ocupação do veículo (volume)</div>
