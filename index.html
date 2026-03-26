@@ -194,7 +194,27 @@
 </div>
 
 <script>
+// ==================== CONFIGURAÇÃO GLOBAL ====================
 const APP_CONFIG = { GOOGLE_API_KEY: "AIzaSyCBovqGqMOw9wYYzZQCrZ2Wttv42vEG3ds" };
+const REGRAS = {
+  distancia: {
+    maxKmDireto: 80,
+    maxKmAnalise: 120
+  },
+  tempo: {
+    maxHorasDireto: 1.5,
+    maxHorasAnalise: 2.5
+  },
+  cubagem: [
+    { tipo: "FIORINO", max: 3 },
+    { tipo: "VAN", max: 7 },
+    { tipo: "VUC", max: 19 },
+    { tipo: "TOCO", max: 30 },
+    { tipo: "TRUCK", max: 45 },
+    { tipo: "CARRETA", max: 90 }
+  ]
+};
+
 let vehicles = [];
 let pedidos = [];
 let operacaoLeve = [];
@@ -208,15 +228,6 @@ function setTextSafe(id, value) {
   const el = document.getElementById(id);
   if (el) el.textContent = value;
 }
-
-const REGIOES_SP = {
-  "VALE_DO_PARAIBA": { nome: "Vale do Paraíba", cidades: ["SAO JOSE DOS CAMPOS","TAUBATE","JACAREI"], integracaoCorredor: "VALE_DO_PARAIBA" },
-  "CAMPINAS": { nome: "Região Campinas", cidades: ["CAMPINAS","JUNDIAI","SUMARE"], integracaoCorredor: "MINAS_GERAIS" },
-  "SOROCABA": { nome: "Região Sorocaba", cidades: ["SOROCABA","ITU","BOITUVA"], integracaoCorredor: "SUL" },
-  "NORTE_SP": { nome: "Norte SP", cidades: ["RIBEIRAO PRETO","FRANCA"], integracaoCorredor: "CENTRO_OESTE" },
-  "LITORAL": { nome: "Litoral", cidades: ["SANTOS","GUARUJA","SAO VICENTE","PRAIA GRANDE"], integracaoCorredor: null }
-};
-let CORREDORES = {};
 
 function normalizarTexto(t) { return (t||"").toString().normalize("NFD").replace(/[\u0300-\u036f]/g,"").trim(); }
 function formatNumber(v) { return v || v===0 ? Number(v).toLocaleString("pt-BR",{minimumFractionDigits:0,maximumFractionDigits:2}) : "-"; }
@@ -232,6 +243,28 @@ function showTab(tabId,btn=null){
 function setStatus(msg,type=""){ let el=document.getElementById("statusPlanejamento"); if(el){ el.className=`status ${type}`; el.innerHTML=msg; } }
 function setStatusBanco(msg,type=""){ let el=document.getElementById("statusBanco"); if(el){ el.className=`status ${type}`; el.innerHTML=msg; } }
 
+// ==================== CORREDORES ====================
+const REGIOES_SP = {
+  "VALE_DO_PARAIBA": { nome: "Vale do Paraíba", cidades: ["SAO JOSE DOS CAMPOS","TAUBATE","JACAREI"], integracaoCorredor: "VALE_DO_PARAIBA" },
+  "CAMPINAS": { nome: "Região Campinas", cidades: ["CAMPINAS","JUNDIAI","SUMARE"], integracaoCorredor: "MINAS_GERAIS" },
+  "SOROCABA": { nome: "Região Sorocaba", cidades: ["SOROCABA","ITU","BOITUVA"], integracaoCorredor: "SUL" },
+  "NORTE_SP": { nome: "Norte SP", cidades: ["RIBEIRAO PRETO","FRANCA"], integracaoCorredor: "CENTRO_OESTE" },
+  "LITORAL": { nome: "Litoral", cidades: ["SANTOS","GUARUJA","SAO VICENTE","PRAIA GRANDE"], integracaoCorredor: null }
+};
+let CORREDORES = {};
+
+function carregarCorredoresDaUI() {
+  const parse = (id) => (document.getElementById(id)?.value || "").split(",").map(v=>normalizarTexto(v).toUpperCase()).filter(Boolean);
+  CORREDORES = {
+    "VALE_DO_PARAIBA": { nome:"Vale do Paraíba", rodovia:"BR-116", ufs:["RJ"], cidades:parse("corridor_paraiba") },
+    "CAMPINAS": { nome:"Campinas", rodovia:"SP-330", ufs:["SP"], cidades:parse("corridor_campinas") },
+    "SUL": { nome:"Sul", rodovia:"BR-116", ufs:["PR","SC","RS"], cidades:parse("corridor_sul") },
+    "MINAS_GERAIS": { nome:"Minas Gerais", rodovia:"BR-381", ufs:["MG"], cidades:parse("corridor_mg") },
+    "CENTRO_OESTE": { nome:"Centro-Oeste", rodovia:"BR-040", ufs:["GO","DF","MT"], cidades:parse("corridor_co") },
+    "NORDESTE": { nome:"Nordeste", rodovia:"BR-116", ufs:["BA","PE","CE"], cidades:parse("corridor_ne") }
+  };
+}
+
 function identificarCorredor(uf,cidade) {
   let u = normalizarTexto(uf).toUpperCase();
   let c = normalizarTexto(cidade).toUpperCase();
@@ -245,15 +278,13 @@ function identificarCorredor(uf,cidade) {
   };
   return MAPA_UF[u] || "OUTROS";
 }
+function isCapitalOuGrandeSP(cep) { let cepNum=(cep||"").replace(/\D/g,""); if(!cepNum || cepNum.length<5) return false; let p=parseInt(cepNum.substring(0,5),10); return p>=1000 && p<=9999; }
+function definirRegiaoSP(cidade) { let c=normalizarTexto(cidade).toUpperCase(); for(let [k,r] of Object.entries(REGIOES_SP)) if(r.cidades.includes(c)) return k; return null; }
+function getCorredorInfo(k) { return CORREDORES[k]||{nome:"Outros",rodovia:"-",cidades:[]}; }
 
-// ========== NOVA LÓGICA DE ESCOLHA DE VEÍCULO POR FAIXA DE CUBAGEM ==========
+// ==================== VEÍCULO POR CUBAGEM ====================
 function definirTipoVeiculoPorVolume(m3) {
-  if (m3 <= 3) return "FIORINO";
-  if (m3 <= 7) return "VAN";
-  if (m3 <= 19) return "VUC";
-  if (m3 <= 30) return "TOCO";
-  if (m3 <= 45) return "TRUCK";
-  return "CARRETA";
+  return REGRAS.cubagem.find(r => m3 <= r.max)?.tipo || "CARRETA";
 }
 
 function tipoDoVeiculo(nome) {
@@ -267,6 +298,7 @@ function tipoDoVeiculo(nome) {
   return "OUTRO";
 }
 
+// NOVA função de escolha com retorno detalhado
 function escolherVeiculoParaCarga(pedidosDaCarga) {
   if (!pedidosDaCarga.length) return null;
 
@@ -274,37 +306,42 @@ function escolherVeiculoParaCarga(pedidosDaCarga) {
   const volumeTotal = pedidosDaCarga.reduce((s,p)=>s+p.volumeTotal,0);
   const notasTotal = pedidosDaCarga.reduce((s,p)=>s+p.numNotas,0);
   const maiorItem = getMaiorItemDaCarga(pedidosDaCarga);
+  const tipoIdeal = definirTipoVeiculoPorVolume(volumeTotal);
 
-  // 1. Define o tipo ideal pela cubagem
-  let tipoIdeal = definirTipoVeiculoPorVolume(volumeTotal);
-
-  // 2. Filtra veículos do tipo ideal
+  // 1. Busca veículos do tipo ideal
   let candidatos = vehicles.filter(v => tipoDoVeiculo(v.nome) === tipoIdeal);
-
-  // 3. Se não houver veículo desse tipo, fallback para todos
   if (!candidatos.length) candidatos = [...vehicles];
 
-  // 4. Tenta usar um veículo do tipo ideal que atenda todas as restrições
+  // 2. Tenta usar um veículo do tipo ideal
   for (let v of candidatos) {
-    if (!cabeNoVeiculoPorDimensao(maiorItem, v)) continue;
-    if (pesoTotal <= v.pesoMax && volumeTotal <= v.volumeMax && notasTotal <= v.notasMax) {
-      // Guarda a regra aplicada para exibição
-      return { veiculo: v, regra: "cubagem" };
+    let motivo = null;
+    if (!cabeNoVeiculoPorDimensao(maiorItem, v)) motivo = `dimensão (item ${formatNumber(maiorItem.altura)}x${formatNumber(maiorItem.largura)}x${formatNumber(maiorItem.profundidade)}m não cabe em ${v.nome})`;
+    else if (pesoTotal > v.pesoMax) motivo = `peso (${formatNumber(pesoTotal)} kg > ${formatNumber(v.pesoMax)} kg)`;
+    else if (volumeTotal > v.volumeMax) motivo = `volume (${formatNumber(volumeTotal)} m³ > ${formatNumber(v.volumeMax)} m³)`;
+    else if (notasTotal > v.notasMax) motivo = `notas (${notasTotal} > ${v.notasMax})`;
+    if (!motivo) {
+      return { veiculo: v, regra: "cubagem", tipoIdeal, motivo: null };
     }
   }
 
-  // 5. Se não deu certo, quebra a regra e tenta qualquer veículo (ordem crescente)
+  // 3. Se não deu certo, quebra a regra e tenta qualquer veículo (ordem crescente)
   const ordenados = [...vehicles].sort((a,b)=> a.volumeMax - b.volumeMax);
   for (let v of ordenados) {
     if (!cabeNoVeiculoPorDimensao(maiorItem, v)) continue;
     if (pesoTotal <= v.pesoMax && volumeTotal <= v.volumeMax && notasTotal <= v.notasMax) {
-      return { veiculo: v, regra: "excecao (dimensão)" };
+      // Descobre qual restrição falhou no veículo ideal
+      let motivoFalha = null;
+      const ideal = candidatos[0] || vehicles[0];
+      if (ideal && !cabeNoVeiculoPorDimensao(maiorItem, ideal)) motivoFalha = `dimensão do maior item`;
+      else if (ideal && pesoTotal > ideal.pesoMax) motivoFalha = `peso (${formatNumber(pesoTotal)} kg > ${formatNumber(ideal.pesoMax)} kg)`;
+      else if (ideal && volumeTotal > ideal.volumeMax) motivoFalha = `volume (${formatNumber(volumeTotal)} m³ > ${formatNumber(ideal.volumeMax)} m³)`;
+      else if (ideal && notasTotal > ideal.notasMax) motivoFalha = `notas (${notasTotal} > ${ideal.notasMax})`;
+      else motivoFalha = `restrição de capacidade`;
+      return { veiculo: v, regra: "excecao", tipoIdeal, motivo: motivoFalha };
     }
   }
-
   return null;
 }
-// ============================================================================
 
 function podeConsolidar(p1, p2) {
   if (p1.grupoConsolidado === "LITORAL_SP" || p2.grupoConsolidado === "LITORAL_SP") {
@@ -353,20 +390,6 @@ function motivoNaoAlocadoCarga(lote) {
   return `Não foi possível alocar: verifique restrições de consolidação ou capacidade.`;
 }
 
-function carregarCorredoresDaUI() {
-  const parse = (id) => (document.getElementById(id)?.value || "").split(",").map(v=>normalizarTexto(v).toUpperCase()).filter(Boolean);
-  CORREDORES = {
-    "VALE_DO_PARAIBA": { nome:"Vale do Paraíba", rodovia:"BR-116", ufs:["RJ"], cidades:parse("corridor_paraiba") },
-    "CAMPINAS": { nome:"Campinas", rodovia:"SP-330", ufs:["SP"], cidades:parse("corridor_campinas") },
-    "SUL": { nome:"Sul", rodovia:"BR-116", ufs:["PR","SC","RS"], cidades:parse("corridor_sul") },
-    "MINAS_GERAIS": { nome:"Minas Gerais", rodovia:"BR-381", ufs:["MG"], cidades:parse("corridor_mg") },
-    "CENTRO_OESTE": { nome:"Centro-Oeste", rodovia:"BR-040", ufs:["GO","DF","MT"], cidades:parse("corridor_co") },
-    "NORDESTE": { nome:"Nordeste", rodovia:"BR-116", ufs:["BA","PE","CE"], cidades:parse("corridor_ne") }
-  };
-}
-function isCapitalOuGrandeSP(cep) { let cepNum=(cep||"").replace(/\D/g,""); if(!cepNum || cepNum.length<5) return false; let p=parseInt(cepNum.substring(0,5),10); return p>=1000 && p<=9999; }
-function definirRegiaoSP(cidade) { let c=normalizarTexto(cidade).toUpperCase(); for(let [k,r] of Object.entries(REGIOES_SP)) if(r.cidades.includes(c)) return k; return null; }
-function getCorredorInfo(k) { return CORREDORES[k]||{nome:"Outros",rodovia:"-",cidades:[]}; }
 function calcularCubagemInteligente(pesoKg, volumeInformado) { let volume = parseNumero(volumeInformado); if (volume > 0) return volume; const regraAuto = document.getElementById("regraCubagemAuto")?.checked !== false; if (!regraAuto) return 0; const fator = parseFloat(document.getElementById("fatorCubagem")?.value || 0.003); return Math.max(pesoKg * fator, 0.01); }
 function custoPorKmPadrao(nome) { let n=normalizarTexto(nome).toLowerCase(); if(n.includes("fiorino")) return 1.8; if(n.includes("van")) return 2.2; if(n.includes("vuc")) return 3.2; if(n.includes("truck")) return 4.8; return 2.5; }
 
@@ -388,6 +411,8 @@ function addVehicle() {
 }
 function removeVehicle(id){ vehicles=vehicles.filter(v=>String(v.id)!==String(id)); salvarNoStorageLocal(); renderVehicles(); atualizarMetricas(); }
 function renderVehicles(){ let tbody=document.getElementById("vehicleTableBody"); if(!vehicles.length){ tbody.innerHTML='<tr><td colspan="7">Nenhum veículo. Clique em "Adicionar Veículo Leve Padrão"</td></tr>'; return; } tbody.innerHTML=vehicles.map(v=>`<tr><td>${v.nome}</td><td>${formatNumber(v.volumeMax)}</td><td>${formatNumber(v.pesoMax)} kg</td><td>${v.notasMax}</td><td>${formatNumber(v.alturaMax)} x ${formatNumber(v.larguraMax)} x ${formatNumber(v.profundidadeMax)} m</td><td>${formatCurrency(v.custoKm)}</td><td><button class="btn btn-red" onclick="removeVehicle('${String(v.id).replace(/'/g,"\\'")}')">X</button></td></tr>`).join(""); }
+function salvarNoStorageLocal() { localStorage.setItem("veiculos", JSON.stringify(vehicles)); }
+function carregarDoStorageLocal() { try { const saved = JSON.parse(localStorage.getItem("veiculos") || "[]"); if (Array.isArray(saved)) vehicles = saved; } catch (e) { vehicles = []; } }
 
 function valorColuna(row,names){ for(let key of Object.keys(row||{})){ let cleanKey=normalizarTexto(key).toUpperCase().replace(/\./g,"").replace(/\s+/g," "); for(let name of names){ let cleanName=normalizarTexto(name).toUpperCase().replace(/\./g,"").replace(/\s+/g," "); if(cleanKey===cleanName) return row[key]; } } return ""; }
 function analisarObs(obs){ 
@@ -412,56 +437,13 @@ function agruparPedidosPorOS(linhas){
   const pedidosAgrupados = Array.from(mapa.values()); pedidosAgrupados.forEach(p => { p.maiorItem = getMaiorItemDoPedido(p); p.maiorAltura = p.maiorItem.altura || 0; p.maiorLargura = p.maiorItem.largura || 0; p.maiorProfundidade = p.maiorItem.profundidade || 0; p.grupoConsolidado = obterChaveAgrupamento(p); }); return pedidosAgrupados;
 }
 
-function renderPedidosSeparados() {
-  const lightTable = document.getElementById("lightRodoviariosTable");
-  const heavyTable = document.getElementById("heavyRodoviariosTable");
-  const exclusivosTable = document.getElementById("exclusivosTable");
-  if (!lightTable || !heavyTable || !exclusivosTable) {
-    console.error("Tabelas não encontradas no DOM");
-    return;
-  }
-  const rodoviarios = pedidos.filter(p => normalizarTexto(p.modalidade).toLowerCase() === "rodoviario");
-  const exclusivos = pedidos.filter(p => p.exclusivo === true);
-  const naoExclusivosRod = rodoviarios.filter(p => !p.exclusivo);
-  const leves = naoExclusivosRod.filter(p => p.pesoTotal <= 1000);
-  const pesados = naoExclusivosRod.filter(p => p.pesoTotal > 1000);
-  console.log(`Render: ${leves.length} leves, ${pesados.length} pesados, ${exclusivos.length} exclusivos`);
-  lightTable.innerHTML = leves.map(p => `<tr><td><input type="checkbox" class="lightCheckbox" value="${p.os}"></td><td>${p.os}</td><td>${p.destinatario?.substring(0,25)||"-"}</td><td>${p.cidade}/${p.uf}</td><td>${formatNumber(p.pesoTotal)} kg</td><td>${formatNumber(p.volumeTotal)} m³</td><td>${formatNumber(p.maiorItem?.dimCritica||0)} m</td></tr>`).join("");
-  heavyTable.innerHTML = pesados.map(p => `<tr><td>${p.os}</td><td>${p.destinatario?.substring(0,25)||"-"}</td><td>${p.cidade}/${p.uf}</td><td>${formatNumber(p.pesoTotal)} kg</td><td>${formatNumber(p.volumeTotal)} m³</td><td>${formatNumber(p.maiorItem?.dimCritica||0)} m</td></tr>`).join("");
-  exclusivosTable.innerHTML = exclusivos.map(p => `<tr><td>${p.os}</td><td>${p.destinatario?.substring(0,25)||"-"}</td><td>${p.cidade}/${p.uf}</td><td>${formatNumber(p.pesoTotal)} kg</td><td>${formatNumber(p.volumeTotal)} m³</td><td>${formatNumber(p.maiorItem?.dimCritica||0)} m</td></tr>`).join("");
-  setTextSafe("mPedidos", pedidos.length);
-}
-
-function toggleSelectAllLight() {
-  const chk = document.getElementById("selectAllLight");
-  const checkboxes = document.querySelectorAll(".lightCheckbox");
-  checkboxes.forEach(cb => cb.checked = chk.checked);
-}
-function enviarLevesParaOperacao() {
-  const checkboxes = document.querySelectorAll(".lightCheckbox:checked");
-  const osSelecionados = Array.from(checkboxes).map(cb => cb.value);
-  if (osSelecionados.length === 0) { alert("Selecione ao menos um pedido rodoviário leve para enviar à operação."); return; }
-  const novosLeves = pedidos.filter(p => osSelecionados.includes(p.os) && !p.exclusivo && normalizarTexto(p.modalidade).toLowerCase() === "rodoviario" && p.pesoTotal <= 1000);
-  operacaoLeve.push(...novosLeves);
-  pedidos = pedidos.filter(p => !osSelecionados.includes(p.os));
-  renderPedidosSeparados();
-  renderOperacaoLeveList();
-  atualizarMetricas();
-  alert(`${novosLeves.length} pedidos leves enviados para operação.`);
-  document.getElementById("selectAllLight").checked = false;
-}
-function renderOperacaoLeveList() {
-  const div = document.getElementById("operacaoLeveList");
-  if (!div) return;
-  if (operacaoLeve.length === 0) { div.innerHTML = "<div>Nenhum pedido enviado para operação.</div>"; return; }
-  div.innerHTML = operacaoLeve.map(p => `<div class="pedido-chip"><strong>${p.os}</strong> - ${p.destinatario||"-"}<br>📍 ${p.cidade}/${p.uf}<br>⚖ ${formatNumber(p.pesoTotal)} kg | 📦 ${formatNumber(p.volumeTotal)} m³</div>`).join("");
-}
-
 function obterChaveAgrupamento(p) { const uf = normalizarTexto(p.uf).toUpperCase(), cidade = normalizarTexto(p.cidade).toUpperCase(), cep = (p.cep || "").replace(/\D/g, ""); const cidadesLitoral = ["SANTOS","GUARUJA","SAO VICENTE","PRAIA GRANDE"]; if (uf === "SP" && cidadesLitoral.includes(cidade)) return "LITORAL_SP"; if (uf === "SP" && cep.length >= 5 && isCapitalOuGrandeSP(cep)) return "SP_CAPITAL"; if (uf === "SP") { const regiao = definirRegiaoSP(cidade); if (regiao && REGIOES_SP[regiao]) { const integracao = REGIOES_SP[regiao].integracaoCorredor; return integracao || regiao; } return "SP_INTERIOR"; } const corredor = identificarCorredor(uf, cidade); return corredor || "OUTROS"; }
 
 function gerarFatorDecisorio(pedidosDaCarga, veiculoObj, grupoChave) {
   const veiculo = veiculoObj.veiculo;
-  const regraAplicada = veiculoObj.regra;
+  const regra = veiculoObj.regra;
+  const tipoIdeal = veiculoObj.tipoIdeal;
+  const motivoFalha = veiculoObj.motivo;
   const maiorItem = getMaiorItemDaCarga(pedidosDaCarga);
   const peso = pedidosDaCarga.reduce((s,p)=>s+p.pesoTotal,0);
   const m3 = pedidosDaCarga.reduce((s,p)=>s+p.volumeTotal,0);
@@ -483,8 +465,15 @@ function gerarFatorDecisorio(pedidosDaCarga, veiculoObj, grupoChave) {
   } else {
     motivoPrincipal = `quantidade de ${notas} notas fiscais (${Math.round(pctNotas)}% da capacidade)`;
   }
+
+  let explicacaoRegra = "";
+  if (regra === "cubagem") {
+    explicacaoRegra = `Regra de cubagem: ${tipoIdeal} (até ${REGRAS.cubagem.find(r=>r.tipo===tipoIdeal).max} m³)`;
+  } else {
+    explicacaoRegra = `Exceção: o veículo ideal (${tipoIdeal}) não atendeu devido a ${motivoFalha}.`;
+  }
   const motivoDimensao = `Maior item ${formatNumber(maiorItem.altura)} x ${formatNumber(maiorItem.largura)} x ${formatNumber(maiorItem.profundidade)} m → veículo mínimo ${veiculo?.nome||"não encontrado"}`;
-  const textoFinal = `Veículo escolhido devido à ${motivoPrincipal}. ${motivoDimensao} (Regra: ${regraAplicada === "cubagem" ? "faixa de cubagem" : "exceção por dimensão"})`;
+  const textoFinal = `Veículo escolhido devido à ${motivoPrincipal}. ${motivoDimensao} (${explicacaoRegra})`;
   return {
     maiorItem,
     motivoDimensao: textoFinal,
@@ -495,10 +484,14 @@ function gerarFatorDecisorio(pedidosDaCarga, veiculoObj, grupoChave) {
     observacoes: [`Peso total ${formatNumber(peso)} kg (${Math.round(pctPeso)}%)`, `Volume total ${formatNumber(m3)} m³ (${Math.round(pctVolume)}%)`, `${notas} notas (${Math.round(pctNotas)}%)`]
   };
 }
+
 function montarEndereco(p){ return [p.logradouro,p.numero,p.bairro,p.cidade,p.uf,p.cep].filter(Boolean).join(", "); }
 
+// ==================== GEOCÓDIGO E MAPA ====================
 async function geocodeAddress(addr) { if (!geocoder) throw new Error("Geocodificador não disponível"); if (!addr) throw new Error("Endereço inválido"); const key = addr.trim().toLowerCase(); if (geocodeCache[key]) return geocodeCache[key]; return new Promise((resolve, reject) => { geocoder.geocode({ address: addr }, (results, status) => { if (status === "OK" && results[0]) { const loc = results[0].geometry.location, coords = { lat: loc.lat(), lng: loc.lng() }; geocodeCache[key] = coords; salvarCacheGeo(); resolve(coords); } else reject(new Error(`Falha ao geocodificar: ${addr}`)); }); }); }
 function clearRoutes() { if (directionsRenderers && directionsRenderers.length) directionsRenderers.forEach(item => item.renderer.setMap(null)); directionsRenderers = []; }
+function salvarCacheGeo() { localStorage.setItem("geo_cache", JSON.stringify(geocodeCache)); }
+function loadLocalCaches() { try { geocodeCache = JSON.parse(localStorage.getItem("geo_cache") || "{}"); } catch (e) { geocodeCache = {}; } }
 
 function otimizarOrdemRota(pedidos, origemCoords) {
   if (pedidos.length <= 1) return pedidos;
@@ -521,6 +514,60 @@ function otimizarOrdemRota(pedidos, origemCoords) {
     naoVisitados.splice(idxMenor, 1);
   }
   return rotaOtimizada;
+}
+
+function calcularDistancia(lat1,lng1,lat2,lng2){ if([lat1,lng1,lat2,lng2].some(v => v===undefined || v===null)) return 999999; const R = 6371, dLat = (lat2-lat1) * Math.PI/180, dLng = (lng2-lng1) * Math.PI/180; const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2; return 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); }
+
+async function desenharRotas(rotas, origem){
+  if(!map || !geocoder) return; clearRoutes(); let origin = await geocodeAddress(origem); depotCoords = origin; let bounds = new google.maps.LatLngBounds(); bounds.extend(origin); let colors = ["#2563eb","#dc2626","#16a34a","#9333ea","#d97706","#0891b2"]; new google.maps.Marker({position:origin,map,title:origem,label:"CD"});
+  for(let idx=0; idx<rotas.length; idx++){
+    let rota=rotas[idx]; if(!rota.pedidos.length) continue; let pontos=[];
+    for(let p of rota.pedidos){ try{ let coord = p.lat && p.lng ? {lat:p.lat,lng:p.lng} : await geocodeAddress(montarEndereco(p)); pontos.push({pedido:p,coord}); bounds.extend(coord); new google.maps.Marker({position:coord,map,title:`${p.os} - ${p.destinatario||""}`,label:String(pontos.length),icon:{path:google.maps.SymbolPath.CIRCLE,scale:8,fillColor:colors[idx%colors.length],fillOpacity:1,strokeColor:"#fff",strokeWeight:1}}); }catch(e){ console.warn("Erro geocode",p.os); } }
+    if(!pontos.length) continue; let service = new google.maps.DirectionsService(); let destination = pontos[pontos.length - 1].coord; let waypoints = pontos.slice(0, -1).map(p => ({ location: p.coord, stopover: true }));
+    await new Promise(resolve => { service.route({ origin, destination, waypoints, travelMode: google.maps.TravelMode.DRIVING, optimizeWaypoints: true }, (res,status)=>{ if(status==="OK"){ let renderer=new google.maps.DirectionsRenderer({map,preserveViewport:true,suppressMarkers:true,polylineOptions:{strokeColor:colors[idx%colors.length],strokeWeight:5}}); renderer.setDirections(res); directionsRenderers.push({ id: rota.id, renderer }); let dist=0; res.routes[0].legs.forEach(l=>{dist+=l.distance?.value||0;}); rota.distanciaKm=dist/1000; rota.custoEstimado=rota.distanciaKm*(rota.veiculo?.custoKm||0); } else console.warn("Directions falhou:", status); resolve(); }); });
+  }
+  if(!bounds.isEmpty()) map.fitBounds(bounds);
+}
+
+function resetAllRouteStyles() {
+  directionsRenderers.forEach(item => {
+    if (item.renderer && item.renderer.setOptions) {
+      item.renderer.setOptions({ polylineOptions: { strokeWeight: 5, strokeColor: "#2563eb" } });
+    }
+  });
+}
+function highlightRouteById(routeId) {
+  const found = directionsRenderers.find(item => item.id === routeId);
+  if (found && found.renderer) {
+    found.renderer.setOptions({ polylineOptions: { strokeWeight: 8, strokeColor: "#ff0000" } });
+  }
+}
+function focusRouteOnMap(rotaId) {
+  const rota = ultimoResultado?.rotas?.find(r => r.id === rotaId);
+  if (!rota || !map || !depotCoords) return;
+  resetAllRouteStyles();
+  highlightRouteById(rotaId);
+  const bounds = new google.maps.LatLngBounds();
+  bounds.extend(depotCoords);
+  for (let p of rota.pedidos) if (p.lat && p.lng) bounds.extend({ lat:p.lat, lng:p.lng });
+  map.fitBounds(bounds);
+}
+
+// ==================== ROTEIRIZAÇÃO INTELIGENTE ====================
+function estimarTempoHoras(distKm, tipoVeiculo) {
+  let velocidade = 60;
+  if (tipoVeiculo === "FIORINO") velocidade = 50;
+  if (tipoVeiculo === "VAN") velocidade = 55;
+  if (tipoVeiculo === "VUC") velocidade = 60;
+  if (tipoVeiculo === "TRUCK") velocidade = 65;
+  return distKm / velocidade;
+}
+
+function decisaoDistanciaTempo(distKm, tipoVeiculo) {
+  const tempo = estimarTempoHoras(distKm, tipoVeiculo);
+  if (tempo <= REGRAS.tempo.maxHorasDireto) return { ok: true, alerta: null };
+  if (tempo <= REGRAS.tempo.maxHorasAnalise) return { ok: true, alerta: "⚠️ Distância/tempo no limite" };
+  return { ok: false, alerta: "❌ Distância/tempo alto → nova rota" };
 }
 
 async function montarRotasInteligentes(pedidosBase) {
@@ -575,8 +622,7 @@ async function montarRotasInteligentes(pedidosBase) {
             pesoTotal: loteOtimizado.reduce((s,p)=>s+p.pesoTotal,0), 
             volumeTotal: loteOtimizado.reduce((s,p)=>s+p.volumeTotal,0), 
             numNotas: loteOtimizado.reduce((s,p)=>s+p.numNotas,0), 
-            veiculo: veiculo,
-            veiculoObj: veiculoObj,
+            veiculo, 
             distanciaKm: 0, 
             custoEstimado: 0, 
             exclusivo: loteOtimizado.some(p => p.exclusivo), 
@@ -593,9 +639,13 @@ async function montarRotasInteligentes(pedidosBase) {
         if (!lote.length) { lote.push(p); continue; }
         let pode = true; 
         for (const existente of lote) { 
-          if (!podeConsolidar(existente, p) || calcularDistancia(existente.lat, existente.lng, p.lat, p.lng) > raioKm) { 
-            pode = false; break; 
-          } 
+          if (!podeConsolidar(existente, p)) { pode = false; break; }
+          const dist = calcularDistancia(existente.lat, existente.lng, p.lat, p.lng);
+          const tipoVeiculo = definirTipoVeiculoPorVolume(
+            lote.reduce((s,x)=>s+x.volumeTotal,0) + p.volumeTotal
+          );
+          const analise = decisaoDistanciaTempo(dist, tipoVeiculo);
+          if (!analise.ok) { pode = false; break; }
         }
         const teste = [...lote, p];
         const pesoTeste = teste.reduce((s,x)=>s+x.pesoTotal,0);
@@ -611,223 +661,45 @@ async function montarRotasInteligentes(pedidosBase) {
   return { rotas, naoAlocados, holdList };
 }
 
-function calcularDistancia(lat1,lng1,lat2,lng2){ if([lat1,lng1,lat2,lng2].some(v => v===undefined || v===null)) return 999999; const R = 6371, dLat = (lat2-lat1) * Math.PI/180, dLng = (lng2-lng1) * Math.PI/180; const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2; return 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); }
-
-async function desenharRotas(rotas, origem){
-  if(!map || !geocoder) return; clearRoutes(); let origin = await geocodeAddress(origem); depotCoords = origin; let bounds = new google.maps.LatLngBounds(); bounds.extend(origin); let colors = ["#2563eb","#dc2626","#16a34a","#9333ea","#d97706","#0891b2"]; new google.maps.Marker({position:origin,map,title:origem,label:"CD"});
-  for(let idx=0; idx<rotas.length; idx++){
-    let rota=rotas[idx]; if(!rota.pedidos.length) continue; let pontos=[];
-    for(let p of rota.pedidos){ try{ let coord = p.lat && p.lng ? {lat:p.lat,lng:p.lng} : await geocodeAddress(montarEndereco(p)); pontos.push({pedido:p,coord}); bounds.extend(coord); new google.maps.Marker({position:coord,map,title:`${p.os} - ${p.destinatario||""}`,label:String(pontos.length),icon:{path:google.maps.SymbolPath.CIRCLE,scale:8,fillColor:colors[idx%colors.length],fillOpacity:1,strokeColor:"#fff",strokeWeight:1}}); }catch(e){ console.warn("Erro geocode",p.os); } }
-    if(!pontos.length) continue; let service = new google.maps.DirectionsService(); let destination = pontos[pontos.length - 1].coord; let waypoints = pontos.slice(0, -1).map(p => ({ location: p.coord, stopover: true }));
-    await new Promise(resolve => { service.route({ origin, destination, waypoints, travelMode: google.maps.TravelMode.DRIVING, optimizeWaypoints: true }, (res,status)=>{ if(status==="OK"){ let renderer=new google.maps.DirectionsRenderer({map,preserveViewport:true,suppressMarkers:true,polylineOptions:{strokeColor:colors[idx%colors.length],strokeWeight:5}}); renderer.setDirections(res); directionsRenderers.push({ id: rota.id, renderer }); let dist=0; res.routes[0].legs.forEach(l=>{dist+=l.distance?.value||0;}); rota.distanciaKm=dist/1000; rota.custoEstimado=rota.distanciaKm*(rota.veiculo?.custoKm||0); } else console.warn("Directions falhou:", status); resolve(); }); });
-  }
-  if(!bounds.isEmpty()) map.fitBounds(bounds);
+function renderPedidosSeparados() {
+  const lightTable = document.getElementById("lightRodoviariosTable");
+  const heavyTable = document.getElementById("heavyRodoviariosTable");
+  const exclusivosTable = document.getElementById("exclusivosTable");
+  if (!lightTable || !heavyTable || !exclusivosTable) { console.error("Tabelas não encontradas"); return; }
+  const rodoviarios = pedidos.filter(p => normalizarTexto(p.modalidade).toLowerCase() === "rodoviario");
+  const exclusivos = pedidos.filter(p => p.exclusivo === true);
+  const naoExclusivosRod = rodoviarios.filter(p => !p.exclusivo);
+  const leves = naoExclusivosRod.filter(p => p.pesoTotal <= 1000);
+  const pesados = naoExclusivosRod.filter(p => p.pesoTotal > 1000);
+  lightTable.innerHTML = leves.map(p => `<tr><td><input type="checkbox" class="lightCheckbox" value="${p.os}"></td><td>${p.os}</td><td>${p.destinatario?.substring(0,25)||"-"}</td><td>${p.cidade}/${p.uf}</td><td>${formatNumber(p.pesoTotal)} kg</td><td>${formatNumber(p.volumeTotal)} m³</td><td>${formatNumber(p.maiorItem?.dimCritica||0)} m</td></tr>`).join("");
+  heavyTable.innerHTML = pesados.map(p => `<tr><td>${p.os}</td><td>${p.destinatario?.substring(0,25)||"-"}</td><td>${p.cidade}/${p.uf}</td><td>${formatNumber(p.pesoTotal)} kg</td><td>${formatNumber(p.volumeTotal)} m³</td><td>${formatNumber(p.maiorItem?.dimCritica||0)} m</td></tr>`).join("");
+  exclusivosTable.innerHTML = exclusivos.map(p => `<tr><td>${p.os}</td><td>${p.destinatario?.substring(0,25)||"-"}</td><td>${p.cidade}/${p.uf}</td><td>${formatNumber(p.pesoTotal)} kg</td><td>${formatNumber(p.volumeTotal)} m³</td><td>${formatNumber(p.maiorItem?.dimCritica||0)} m</td></tr>`).join("");
+  setTextSafe("mPedidos", pedidos.length);
 }
 
-function resetAllRouteStyles() {
-  directionsRenderers.forEach(item => {
-    if (item.renderer && item.renderer.setOptions) {
-      item.renderer.setOptions({ polylineOptions: { strokeWeight: 5, strokeColor: "#2563eb" } });
-    }
-  });
+function toggleSelectAllLight() {
+  const chk = document.getElementById("selectAllLight");
+  const checkboxes = document.querySelectorAll(".lightCheckbox");
+  checkboxes.forEach(cb => cb.checked = chk.checked);
 }
-function highlightRouteById(routeId) {
-  const found = directionsRenderers.find(item => item.id === routeId);
-  if (found && found.renderer) {
-    found.renderer.setOptions({ polylineOptions: { strokeWeight: 8, strokeColor: "#ff0000" } });
-  }
-}
-function focusRouteOnMap(rotaId) {
-  const rota = ultimoResultado?.rotas?.find(r => r.id === rotaId);
-  if (!rota || !map || !depotCoords) return;
-  resetAllRouteStyles();
-  highlightRouteById(rotaId);
-  const bounds = new google.maps.LatLngBounds();
-  bounds.extend(depotCoords);
-  for (let p of rota.pedidos) if (p.lat && p.lng) bounds.extend({ lat:p.lat, lng:p.lng });
-  map.fitBounds(bounds);
-}
-
-function corOcupacao(pct) {
-  if (pct < 50) return "#ef4444";
-  if (pct < 80) return "#f59e0b";
-  return "#22c55e";
-}
-function calcularOcupacao(rota) {
-  if (!rota.veiculo || rota.veiculo.volumeMax <= 0) return 0;
-  return Math.min((rota.volumeTotal / rota.veiculo.volumeMax) * 100, 100);
-}
-
-function verDetalheRota(rotaId) { 
-  const rota = ultimoResultado?.rotas?.find(r => r.id === rotaId); 
-  if (!rota) return; 
-  const ocupacao = calcularOcupacao(rota);
-  const cor = corOcupacao(ocupacao);
-  let html = `<h3>Detalhes da Rota</h3><p><strong>Corredor:</strong> ${rota.nomeCorredor} (${rota.rodovia})</p><p><strong>Data de Entrega:</strong> ${rota.dataEntrega}</p><p><strong>Veículo:</strong> ${rota.veiculo?.nome} (${formatNumber(rota.veiculo?.volumeMax)} m³, ${formatNumber(rota.veiculo?.pesoMax)} kg)</p>`;
-  html += `
-    <div class="ocupacao-box">
-      <div class="ocupacao-label">📦 Ocupação do veículo (volume)</div>
-      <div class="ocupacao-bar">
-        <div class="ocupacao-fill" style="width: ${ocupacao}%; background: ${cor};"></div>
-      </div>
-      <div class="ocupacao-text">${ocupacao.toFixed(0)}% (${formatNumber(rota.volumeTotal)} m³ / ${formatNumber(rota.veiculo?.volumeMax)} m³)</div>
-    </div>
-  `;
-  html += `<p><strong>Fator Decisório:</strong> ${rota.fatorDecisorio}</p><div class="decision-box"><strong>Resumo decisório</strong><br>${rota.decisao?.motivoDimensao || "-"}<br>Corredor/Regra: ${rota.decisao?.corredor || "-"}<br>Regras aplicadas: ${(rota.decisao?.regrasAplicadas||[]).join(" | ")}<br>Observações: ${(rota.decisao?.observacoes||[]).join(" | ")}</div><p><strong>Totais:</strong> ${formatNumber(rota.pesoTotal)} kg, ${formatNumber(rota.volumeTotal)} m³, ${rota.numNotas} notas, ${formatNumber(rota.distanciaKm)} km, ${formatCurrency(rota.custoEstimado)}</p>`; 
-  if (rota.itemCritico?.item) { const it = rota.itemCritico.item; html += `<div class="critical-item"><strong>🎯 Item crítico que definiu o veículo</strong><br>Código: ${it.codigo || '-'}<br>Descrição: ${it.descricao || '-'}<br>Dimensões: ${formatNumber(it.altura||0)} x ${formatNumber(it.largura||0)} x ${formatNumber(it.profundidade||0)} m<br>Peso: ${formatNumber(it.peso||0)} kg | Volume: ${formatNumber(it.volume||0)} m³</div>`; } 
-  html += `<h4>Pedidos na rota:</h4>`; 
-  for (let p of rota.pedidos) { 
-    const dataEntrega = p.dataPrevisao ? p.dataPrevisao : "Sem data";
-    html += `<div class="pedido-chip">
-      <strong>${p.os}</strong> - ${p.destinatario||"-"}<br>
-      📍 ${p.cidade}/${p.uf}<br>
-      📅 ${dataEntrega}<br>
-      ⚖ ${formatNumber(p.pesoTotal)} kg | 📦 ${formatNumber(p.volumeTotal)} m³
-      <details><summary>Itens</summary>`;
-    for (let item of p.items) {
-      html += `<div style="margin:5px 0; padding-left:10px; border-left:2px solid #ccc;">
-        <strong>${item.codigo || '-'}</strong> - ${item.descricao || '-'}<br>
-        Dimensões: ${formatNumber(item.altura||0)} x ${formatNumber(item.largura||0)} x ${formatNumber(item.profundidade||0)} m | ${formatNumber(item.peso||0)} kg | ${formatNumber(item.volume||0)} m³
-      </div>`;
-    }
-    html += `</details></div>`;
-  } 
-  document.getElementById("modalContent").innerHTML = html; 
-  document.getElementById("routeModal").style.display = "block";
-}
-
-function removerPedidoDaRota(rotaId, pedidoOs) {
-  if (!ultimoResultado) return;
-  const rotaIndex = ultimoResultado.rotas.findIndex(r => r.id === rotaId);
-  if (rotaIndex === -1) return;
-  const rota = ultimoResultado.rotas[rotaIndex];
-  const pedidoIndex = rota.pedidos.findIndex(p => p.os === pedidoOs);
-  if (pedidoIndex === -1) return;
-  const pedidoRemovido = rota.pedidos[pedidoIndex];
-  rota.pedidos.splice(pedidoIndex, 1);
-  rota.pesoTotal = rota.pedidos.reduce((s,p)=>s+p.pesoTotal,0);
-  rota.volumeTotal = rota.pedidos.reduce((s,p)=>s+p.volumeTotal,0);
-  rota.numNotas = rota.pedidos.reduce((s,p)=>s+p.numNotas,0);
-  if (rota.pedidos.length === 0) {
-    ultimoResultado.rotas.splice(rotaIndex, 1);
-  } else {
-    const veiculoObj = escolherVeiculoParaCarga(rota.pedidos);
-    if (veiculoObj) {
-      rota.veiculo = veiculoObj.veiculo;
-      rota.veiculoObj = veiculoObj;
-      const novaDecisao = gerarFatorDecisorio(rota.pedidos, veiculoObj, rota.grupoChave);
-      rota.fatorDecisorio = novaDecisao.motivoDimensao;
-      rota.decisao = novaDecisao;
-      rota.maiorItem = novaDecisao.maiorItem;
-      rota.itemCritico = { item: novaDecisao.maiorItem };
-    } else {
-      ultimoResultado.naoAlocados.push(...rota.pedidos.map(p => ({ ...p, motivo: "Rota sem veículo após remoção" })));
-      ultimoResultado.rotas.splice(rotaIndex, 1);
-    }
-  }
-  ultimoResultado.naoAlocados.push({ ...pedidoRemovido, motivo: "Removido manualmente da rota" });
+function enviarLevesParaOperacao() {
+  const checkboxes = document.querySelectorAll(".lightCheckbox:checked");
+  const osSelecionados = Array.from(checkboxes).map(cb => cb.value);
+  if (osSelecionados.length === 0) { alert("Selecione ao menos um pedido rodoviário leve para enviar à operação."); return; }
+  const novosLeves = pedidos.filter(p => osSelecionados.includes(p.os) && !p.exclusivo && normalizarTexto(p.modalidade).toLowerCase() === "rodoviario" && p.pesoTotal <= 1000);
+  operacaoLeve.push(...novosLeves);
+  pedidos = pedidos.filter(p => !osSelecionados.includes(p.os));
+  renderPedidosSeparados();
+  renderOperacaoLeveList();
   atualizarMetricas();
-  renderMapControls();
-  renderResumo();
-  if (map && geocoder) desenharRotas(ultimoResultado.rotas, document.getElementById("depot").value);
-  setStatus("Pedido removido da rota.", "warn");
+  alert(`${novosLeves.length} pedidos leves enviados para operação.`);
+  document.getElementById("selectAllLight").checked = false;
 }
-
-function moverPedidoParaRota(rotaOrigemId, pedidoOs, rotaDestinoId) {
-  if (!ultimoResultado) return;
-  const rotaOrigem = ultimoResultado.rotas.find(r => r.id === rotaOrigemId);
-  if (!rotaOrigem) return;
-  const pedidoIndex = rotaOrigem.pedidos.findIndex(p => p.os === pedidoOs);
-  if (pedidoIndex === -1) return;
-  const pedido = rotaOrigem.pedidos[pedidoIndex];
-  const rotaDestino = ultimoResultado.rotas.find(r => r.id === rotaDestinoId);
-  if (!rotaDestino) return;
-  rotaOrigem.pedidos.splice(pedidoIndex, 1);
-  rotaDestino.pedidos.push(pedido);
-  if (rotaOrigem.pedidos.length === 0) {
-    const idx = ultimoResultado.rotas.findIndex(r => r.id === rotaOrigemId);
-    if (idx !== -1) ultimoResultado.rotas.splice(idx, 1);
-  } else {
-    rotaOrigem.pesoTotal = rotaOrigem.pedidos.reduce((s,p)=>s+p.pesoTotal,0);
-    rotaOrigem.volumeTotal = rotaOrigem.pedidos.reduce((s,p)=>s+p.volumeTotal,0);
-    rotaOrigem.numNotas = rotaOrigem.pedidos.reduce((s,p)=>s+p.numNotas,0);
-    const veiculoObj = escolherVeiculoParaCarga(rotaOrigem.pedidos);
-    if (veiculoObj) {
-      rotaOrigem.veiculo = veiculoObj.veiculo;
-      rotaOrigem.veiculoObj = veiculoObj;
-      const novaDecisao = gerarFatorDecisorio(rotaOrigem.pedidos, veiculoObj, rotaOrigem.grupoChave);
-      rotaOrigem.fatorDecisorio = novaDecisao.motivoDimensao;
-      rotaOrigem.decisao = novaDecisao;
-      rotaOrigem.maiorItem = novaDecisao.maiorItem;
-      rotaOrigem.itemCritico = { item: novaDecisao.maiorItem };
-    } else {
-      ultimoResultado.naoAlocados.push(...rotaOrigem.pedidos.map(p => ({ ...p, motivo: "Rota sem veículo após movimentação" })));
-      const idx = ultimoResultado.rotas.findIndex(r => r.id === rotaOrigemId);
-      if (idx !== -1) ultimoResultado.rotas.splice(idx, 1);
-    }
-  }
-  rotaDestino.pesoTotal = rotaDestino.pedidos.reduce((s,p)=>s+p.pesoTotal,0);
-  rotaDestino.volumeTotal = rotaDestino.pedidos.reduce((s,p)=>s+p.volumeTotal,0);
-  rotaDestino.numNotas = rotaDestino.pedidos.reduce((s,p)=>s+p.numNotas,0);
-  const veiculoObjDest = escolherVeiculoParaCarga(rotaDestino.pedidos);
-  if (veiculoObjDest) {
-    rotaDestino.veiculo = veiculoObjDest.veiculo;
-    rotaDestino.veiculoObj = veiculoObjDest;
-    const novaDecisao = gerarFatorDecisorio(rotaDestino.pedidos, veiculoObjDest, rotaDestino.grupoChave);
-    rotaDestino.fatorDecisorio = novaDecisao.motivoDimensao;
-    rotaDestino.decisao = novaDecisao;
-    rotaDestino.maiorItem = novaDecisao.maiorItem;
-    rotaDestino.itemCritico = { item: novaDecisao.maiorItem };
-  } else {
-    ultimoResultado.naoAlocados.push(...rotaDestino.pedidos.map(p => ({ ...p, motivo: "Rota sem veículo após movimentação" })));
-    const idx = ultimoResultado.rotas.findIndex(r => r.id === rotaDestinoId);
-    if (idx !== -1) ultimoResultado.rotas.splice(idx, 1);
-  }
-  atualizarMetricas();
-  renderMapControls();
-  renderResumo();
-  if (map && geocoder) desenharRotas(ultimoResultado.rotas, document.getElementById("depot").value);
-  setStatus(`Pedido ${pedido.os} movido para rota ${rotaDestino.nomeCorredor}.`, "ok");
-}
-
-function moverAguardandoParaRota(pedidoOs, rotaId) {
-  if (!ultimoResultado || !rotaId) return;
-  const pedidoIndex = ultimoResultado.aguardandoDefinicao.findIndex(p => p.os === pedidoOs);
-  if (pedidoIndex === -1) return;
-  const pedido = ultimoResultado.aguardandoDefinicao[pedidoIndex];
-  const rota = ultimoResultado.rotas.find(r => r.id === rotaId);
-  if (!rota) return;
-
-  if (!podeConsolidar(rota.pedidos[0], pedido)) {
-    alert("Pedido não é compatível com a rota selecionada (corredor/data).");
-    return;
-  }
-  const teste = [...rota.pedidos, pedido];
-  const veiculoObj = escolherVeiculoParaCarga(teste);
-  if (!veiculoObj) {
-    alert("Não cabe na rota (capacidade de peso, volume ou notas excedida).");
-    return;
-  }
-
-  rota.pedidos.push(pedido);
-  rota.pesoTotal = rota.pedidos.reduce((s,p)=>s+p.pesoTotal,0);
-  rota.volumeTotal = rota.pedidos.reduce((s,p)=>s+p.volumeTotal,0);
-  rota.numNotas = rota.pedidos.reduce((s,p)=>s+p.numNotas,0);
-  rota.veiculo = veiculoObj.veiculo;
-  rota.veiculoObj = veiculoObj;
-  const novaDecisao = gerarFatorDecisorio(rota.pedidos, veiculoObj, rota.grupoChave);
-  rota.fatorDecisorio = novaDecisao.motivoDimensao;
-  rota.decisao = novaDecisao;
-  rota.maiorItem = novaDecisao.maiorItem;
-  rota.itemCritico = { item: novaDecisao.maiorItem };
-
-  ultimoResultado.aguardandoDefinicao.splice(pedidoIndex, 1);
-
-  atualizarMetricas();
-  renderMapControls();
-  renderResumo();
-  if (map && geocoder) desenharRotas(ultimoResultado.rotas, document.getElementById("depot").value);
-  setStatus(`Pedido ${pedido.os} adicionado à rota.`, "ok");
+function renderOperacaoLeveList() {
+  const div = document.getElementById("operacaoLeveList");
+  if (!div) return;
+  if (operacaoLeve.length === 0) { div.innerHTML = "<div>Nenhum pedido enviado para operação.</div>"; return; }
+  div.innerHTML = operacaoLeve.map(p => `<div class="pedido-chip"><strong>${p.os}</strong> - ${p.destinatario||"-"}<br>📍 ${p.cidade}/${p.uf}<br>⚖ ${formatNumber(p.pesoTotal)} kg | 📦 ${formatNumber(p.volumeTotal)} m³</div>`).join("");
 }
 
 function renderMapControls() {
@@ -881,6 +753,17 @@ function renderMapControls() {
   }
 }
 
+function gerarSugestoes(rotas) {
+  let sugestoes = [];
+  rotas.forEach(r => {
+    const ocupacao = (r.volumeTotal / r.veiculo.volumeMax) * 100;
+    if (ocupacao < 50) sugestoes.push(`Rota ${r.nomeCorredor}: baixa ocupação (${ocupacao.toFixed(0)}%)`);
+    if (ocupacao > 90) sugestoes.push(`Rota ${r.nomeCorredor}: risco de excesso (${ocupacao.toFixed(0)}%)`);
+    if (r.distanciaKm > 100) sugestoes.push(`Rota ${r.nomeCorredor}: distância alta (${r.distanciaKm.toFixed(0)} km)`);
+  });
+  return sugestoes;
+}
+
 function renderResumo(){ 
   let el=document.getElementById("resumoOperacional"); 
   if(!ultimoResultado){ 
@@ -893,7 +776,183 @@ function renderResumo(){
     if(!porCorredor.has(r.nomeCorredor)) porCorredor.set(r.nomeCorredor,[]); 
     porCorredor.get(r.nomeCorredor).push(r); 
   } 
-  if(el) el.innerHTML=`<div class="grid grid-2"><div class="metric"><div class="label">Rotas</div><div class="value">${rotas.length}</div></div><div class="metric"><div class="label">Não Alocados</div><div class="value">${naoAlocados.length}</div></div><div class="metric"><div class="label">Aguardando (Hold)</div><div class="value">${holdList.length}</div></div><div class="metric"><div class="label">Aguardando Definição</div><div class="value">${aguardandoDefinicao.length}</div></div></div><h3>Por Corredor</h3><div class="table-wrap" style="padding:12px;">${Array.from(porCorredor.entries()).map(([nome,rs])=>`<div><strong>${nome}</strong>: ${rs.length} rotas, ${formatNumber(rs.reduce((s,r)=>s+r.pesoTotal,0))} kg, ${formatCurrency(rs.reduce((s,r)=>s+r.custoEstimado,0))}</div>`).join("") || "<div>Sem corredores</div>"}</div>`; 
+  let sugestoesHtml = "";
+  const sugestoes = gerarSugestoes(rotas);
+  if (sugestoes.length) {
+    sugestoesHtml = `<div class="card"><h3>🧠 Sugestões Inteligentes</h3>${sugestoes.map(s => `<div class="inline-alert">${s}</div>`).join("")}</div>`;
+  } else {
+    sugestoesHtml = `<div class="card"><h3>🧠 Sugestões Inteligentes</h3><div>Tudo otimizado ✅</div></div>`;
+  }
+  if(el) el.innerHTML=`<div class="grid grid-2"><div class="metric"><div class="label">Rotas</div><div class="value">${rotas.length}</div></div><div class="metric"><div class="label">Não Alocados</div><div class="value">${naoAlocados.length}</div></div><div class="metric"><div class="label">Aguardando (Hold)</div><div class="value">${holdList.length}</div></div><div class="metric"><div class="label">Aguardando Definição</div><div class="value">${aguardandoDefinicao.length}</div></div></div><h3>Por Corredor</h3><div class="table-wrap" style="padding:12px;">${Array.from(porCorredor.entries()).map(([nome,rs])=>`<div><strong>${nome}</strong>: ${rs.length} rotas, ${formatNumber(rs.reduce((s,r)=>s+r.pesoTotal,0))} kg, ${formatCurrency(rs.reduce((s,r)=>s+r.custoEstimado,0))}</div>`).join("") || "<div>Sem corredores</div>"}</div>${sugestoesHtml}`; 
+}
+
+function verDetalheRota(rotaId) { 
+  const rota = ultimoResultado?.rotas?.find(r => r.id === rotaId); 
+  if (!rota) return; 
+  const ocupacao = (rota.volumeTotal / rota.veiculo.volumeMax) * 100;
+  const cor = ocupacao < 50 ? "#ef4444" : (ocupacao < 80 ? "#f59e0b" : "#22c55e");
+  let html = `<h3>Detalhes da Rota</h3><p><strong>Corredor:</strong> ${rota.nomeCorredor} (${rota.rodovia})</p><p><strong>Data de Entrega:</strong> ${rota.dataEntrega}</p><p><strong>Veículo:</strong> ${rota.veiculo?.nome} (${formatNumber(rota.veiculo?.volumeMax)} m³, ${formatNumber(rota.veiculo?.pesoMax)} kg)</p>`;
+  html += `
+    <div class="ocupacao-box">
+      <div class="ocupacao-label">📦 Ocupação do veículo (volume)</div>
+      <div class="ocupacao-bar">
+        <div class="ocupacao-fill" style="width: ${ocupacao}%; background: ${cor};"></div>
+      </div>
+      <div class="ocupacao-text">${ocupacao.toFixed(0)}% (${formatNumber(rota.volumeTotal)} m³ / ${formatNumber(rota.veiculo?.volumeMax)} m³)</div>
+    </div>
+  `;
+  html += `<p><strong>Fator Decisório:</strong> ${rota.fatorDecisorio}</p><div class="decision-box"><strong>Resumo decisório</strong><br>${rota.decisao?.motivoDimensao || "-"}<br>Corredor/Regra: ${rota.decisao?.corredor || "-"}<br>Regras aplicadas: ${(rota.decisao?.regrasAplicadas||[]).join(" | ")}<br>Observações: ${(rota.decisao?.observacoes||[]).join(" | ")}</div><p><strong>Totais:</strong> ${formatNumber(rota.pesoTotal)} kg, ${formatNumber(rota.volumeTotal)} m³, ${rota.numNotas} notas, ${formatNumber(rota.distanciaKm)} km, ${formatCurrency(rota.custoEstimado)}</p>`; 
+  if (rota.itemCritico?.item) { const it = rota.itemCritico.item; html += `<div class="critical-item"><strong>🎯 Item crítico que definiu o veículo</strong><br>Código: ${it.codigo || '-'}<br>Descrição: ${it.descricao || '-'}<br>Dimensões: ${formatNumber(it.altura||0)} x ${formatNumber(it.largura||0)} x ${formatNumber(it.profundidade||0)} m<br>Peso: ${formatNumber(it.peso||0)} kg | Volume: ${formatNumber(it.volume||0)} m³</div>`; } 
+  html += `<h4>Pedidos na rota:</h4>`; 
+  for (let p of rota.pedidos) { 
+    const dataEntrega = p.dataPrevisao ? p.dataPrevisao : "Sem data";
+    html += `<div class="pedido-chip">
+      <strong>${p.os}</strong> - ${p.destinatario||"-"}<br>
+      📍 ${p.cidade}/${p.uf}<br>
+      📅 ${dataEntrega}<br>
+      ⚖ ${formatNumber(p.pesoTotal)} kg | 📦 ${formatNumber(p.volumeTotal)} m³
+      <details><summary>Itens</summary>`;
+    for (let item of p.items) {
+      html += `<div style="margin:5px 0; padding-left:10px; border-left:2px solid #ccc;">
+        <strong>${item.codigo || '-'}</strong> - ${item.descricao || '-'}<br>
+        Dimensões: ${formatNumber(item.altura||0)} x ${formatNumber(item.largura||0)} x ${formatNumber(item.profundidade||0)} m | ${formatNumber(item.peso||0)} kg | ${formatNumber(item.volume||0)} m³
+      </div>`;
+    }
+    html += `</details></div>`;
+  } 
+  document.getElementById("modalContent").innerHTML = html; 
+  document.getElementById("routeModal").style.display = "block";
+}
+
+// ==================== FUNÇÕES PARA MOVER/EXCLUIR PEDIDOS ====================
+function removerPedidoDaRota(rotaId, pedidoOs) {
+  if (!ultimoResultado) return;
+  const rotaIndex = ultimoResultado.rotas.findIndex(r => r.id === rotaId);
+  if (rotaIndex === -1) return;
+  const rota = ultimoResultado.rotas[rotaIndex];
+  const pedidoIndex = rota.pedidos.findIndex(p => p.os === pedidoOs);
+  if (pedidoIndex === -1) return;
+  const pedidoRemovido = rota.pedidos[pedidoIndex];
+  rota.pedidos.splice(pedidoIndex, 1);
+  rota.pesoTotal = rota.pedidos.reduce((s,p)=>s+p.pesoTotal,0);
+  rota.volumeTotal = rota.pedidos.reduce((s,p)=>s+p.volumeTotal,0);
+  rota.numNotas = rota.pedidos.reduce((s,p)=>s+p.numNotas,0);
+  if (rota.pedidos.length === 0) {
+    ultimoResultado.rotas.splice(rotaIndex, 1);
+  } else {
+    const veiculoObj = escolherVeiculoParaCarga(rota.pedidos);
+    if (veiculoObj) {
+      rota.veiculo = veiculoObj.veiculo;
+      const novaDecisao = gerarFatorDecisorio(rota.pedidos, veiculoObj, rota.grupoChave);
+      rota.fatorDecisorio = novaDecisao.motivoDimensao;
+      rota.decisao = novaDecisao;
+      rota.maiorItem = novaDecisao.maiorItem;
+      rota.itemCritico = { item: novaDecisao.maiorItem };
+    } else {
+      ultimoResultado.naoAlocados.push(...rota.pedidos.map(p => ({ ...p, motivo: "Rota sem veículo após remoção" })));
+      ultimoResultado.rotas.splice(rotaIndex, 1);
+    }
+  }
+  ultimoResultado.naoAlocados.push({ ...pedidoRemovido, motivo: "Removido manualmente da rota" });
+  atualizarMetricas();
+  renderMapControls();
+  renderResumo();
+  if (map && geocoder) desenharRotas(ultimoResultado.rotas, document.getElementById("depot").value);
+  setStatus("Pedido removido da rota.", "warn");
+}
+
+function moverPedidoParaRota(rotaOrigemId, pedidoOs, rotaDestinoId) {
+  if (!ultimoResultado) return;
+  const rotaOrigem = ultimoResultado.rotas.find(r => r.id === rotaOrigemId);
+  if (!rotaOrigem) return;
+  const pedidoIndex = rotaOrigem.pedidos.findIndex(p => p.os === pedidoOs);
+  if (pedidoIndex === -1) return;
+  const pedido = rotaOrigem.pedidos[pedidoIndex];
+  const rotaDestino = ultimoResultado.rotas.find(r => r.id === rotaDestinoId);
+  if (!rotaDestino) return;
+  rotaOrigem.pedidos.splice(pedidoIndex, 1);
+  rotaDestino.pedidos.push(pedido);
+  if (rotaOrigem.pedidos.length === 0) {
+    const idx = ultimoResultado.rotas.findIndex(r => r.id === rotaOrigemId);
+    if (idx !== -1) ultimoResultado.rotas.splice(idx, 1);
+  } else {
+    rotaOrigem.pesoTotal = rotaOrigem.pedidos.reduce((s,p)=>s+p.pesoTotal,0);
+    rotaOrigem.volumeTotal = rotaOrigem.pedidos.reduce((s,p)=>s+p.volumeTotal,0);
+    rotaOrigem.numNotas = rotaOrigem.pedidos.reduce((s,p)=>s+p.numNotas,0);
+    const veiculoObj = escolherVeiculoParaCarga(rotaOrigem.pedidos);
+    if (veiculoObj) {
+      rotaOrigem.veiculo = veiculoObj.veiculo;
+      const novaDecisao = gerarFatorDecisorio(rotaOrigem.pedidos, veiculoObj, rotaOrigem.grupoChave);
+      rotaOrigem.fatorDecisorio = novaDecisao.motivoDimensao;
+      rotaOrigem.decisao = novaDecisao;
+      rotaOrigem.maiorItem = novaDecisao.maiorItem;
+      rotaOrigem.itemCritico = { item: novaDecisao.maiorItem };
+    } else {
+      ultimoResultado.naoAlocados.push(...rotaOrigem.pedidos.map(p => ({ ...p, motivo: "Rota sem veículo após movimentação" })));
+      const idx = ultimoResultado.rotas.findIndex(r => r.id === rotaOrigemId);
+      if (idx !== -1) ultimoResultado.rotas.splice(idx, 1);
+    }
+  }
+  rotaDestino.pesoTotal = rotaDestino.pedidos.reduce((s,p)=>s+p.pesoTotal,0);
+  rotaDestino.volumeTotal = rotaDestino.pedidos.reduce((s,p)=>s+p.volumeTotal,0);
+  rotaDestino.numNotas = rotaDestino.pedidos.reduce((s,p)=>s+p.numNotas,0);
+  const veiculoObjDest = escolherVeiculoParaCarga(rotaDestino.pedidos);
+  if (veiculoObjDest) {
+    rotaDestino.veiculo = veiculoObjDest.veiculo;
+    const novaDecisao = gerarFatorDecisorio(rotaDestino.pedidos, veiculoObjDest, rotaDestino.grupoChave);
+    rotaDestino.fatorDecisorio = novaDecisao.motivoDimensao;
+    rotaDestino.decisao = novaDecisao;
+    rotaDestino.maiorItem = novaDecisao.maiorItem;
+    rotaDestino.itemCritico = { item: novaDecisao.maiorItem };
+  } else {
+    ultimoResultado.naoAlocados.push(...rotaDestino.pedidos.map(p => ({ ...p, motivo: "Rota sem veículo após movimentação" })));
+    const idx = ultimoResultado.rotas.findIndex(r => r.id === rotaDestinoId);
+    if (idx !== -1) ultimoResultado.rotas.splice(idx, 1);
+  }
+  atualizarMetricas();
+  renderMapControls();
+  renderResumo();
+  if (map && geocoder) desenharRotas(ultimoResultado.rotas, document.getElementById("depot").value);
+  setStatus(`Pedido ${pedido.os} movido para rota ${rotaDestino.nomeCorredor}.`, "ok");
+}
+
+function moverAguardandoParaRota(pedidoOs, rotaId) {
+  if (!ultimoResultado || !rotaId) return;
+  const pedidoIndex = ultimoResultado.aguardandoDefinicao.findIndex(p => p.os === pedidoOs);
+  if (pedidoIndex === -1) return;
+  const pedido = ultimoResultado.aguardandoDefinicao[pedidoIndex];
+  const rota = ultimoResultado.rotas.find(r => r.id === rotaId);
+  if (!rota) return;
+
+  if (!podeConsolidar(rota.pedidos[0], pedido)) {
+    alert("Pedido não é compatível com a rota selecionada (corredor/data).");
+    return;
+  }
+  const teste = [...rota.pedidos, pedido];
+  const veiculoObj = escolherVeiculoParaCarga(teste);
+  if (!veiculoObj) {
+    alert("Não cabe na rota (capacidade de peso, volume ou notas excedida).");
+    return;
+  }
+
+  rota.pedidos.push(pedido);
+  rota.pesoTotal = rota.pedidos.reduce((s,p)=>s+p.pesoTotal,0);
+  rota.volumeTotal = rota.pedidos.reduce((s,p)=>s+p.volumeTotal,0);
+  rota.numNotas = rota.pedidos.reduce((s,p)=>s+p.numNotas,0);
+  rota.veiculo = veiculoObj.veiculo;
+  const novaDecisao = gerarFatorDecisorio(rota.pedidos, veiculoObj, rota.grupoChave);
+  rota.fatorDecisorio = novaDecisao.motivoDimensao;
+  rota.decisao = novaDecisao;
+  rota.maiorItem = novaDecisao.maiorItem;
+  rota.itemCritico = { item: novaDecisao.maiorItem };
+
+  ultimoResultado.aguardandoDefinicao.splice(pedidoIndex, 1);
+
+  atualizarMetricas();
+  renderMapControls();
+  renderResumo();
+  if (map && geocoder) desenharRotas(ultimoResultado.rotas, document.getElementById("depot").value);
+  setStatus(`Pedido ${pedido.os} adicionado à rota.`, "ok");
 }
 
 function atualizarMetricas(){ 
@@ -953,6 +1012,7 @@ async function executarPlanejamento(){
     setStatus(`Erro: ${err.message}`,"err"); 
   } 
 }
+
 function replanejarRotas() { 
   if (pedidos.length === 0) { alert("Nenhum pedido importado. Importe um CSV primeiro."); showTab("pedidos"); return; } 
   if (vehicles.length === 0) { alert("Nenhum veículo cadastrado. Adicione veículos na aba Parâmetros."); showTab("parametros"); return; } 
@@ -996,12 +1056,7 @@ function baixarModeloPedidos(){
   a.click(); 
   URL.revokeObjectURL(a.href); 
 }
-function carregarDoStorageLocal() { 
-  try { const saved = JSON.parse(localStorage.getItem("veiculos") || "[]"); if (Array.isArray(saved)) vehicles = saved; } catch (e) { vehicles = []; } 
-}
-function salvarNoStorageLocal() { localStorage.setItem("veiculos", JSON.stringify(vehicles)); }
-function loadLocalCaches() { try { geocodeCache = JSON.parse(localStorage.getItem("geo_cache") || "{}"); } catch (e) { geocodeCache = {}; } }
-function salvarCacheGeo() { localStorage.setItem("geo_cache", JSON.stringify(geocodeCache)); }
+
 function loadGoogleMaps() {
   const mapEl = document.getElementById("map");
   if (!APP_CONFIG.GOOGLE_API_KEY || APP_CONFIG.GOOGLE_API_KEY === "COLE_SUA_CHAVE_AQUI") {
@@ -1033,6 +1088,7 @@ function loadGoogleMaps() {
   script.onerror = () => { if (mapEl) mapEl.innerHTML = "Erro ao carregar Google Maps. Verifique a chave e as APIs ativadas."; };
   document.head.appendChild(script);
 }
+
 function initCSVImport() { 
   const input = document.getElementById("ordersCsvFile"); 
   if (!input) return; 
@@ -1062,6 +1118,7 @@ function initCSVImport() {
     }); 
   }); 
 }
+
 document.addEventListener("DOMContentLoaded", () => { 
   carregarCorredoresDaUI(); 
   loadLocalCaches(); 
