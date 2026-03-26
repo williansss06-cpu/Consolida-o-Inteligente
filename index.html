@@ -1540,17 +1540,28 @@ function loadGoogleMaps() {
     }
     return;
   }
-  window.initMapCallback = function() {
+ window.initMapCallback = function() {
+  const mapEl = document.getElementById("map");
   if (!window.google || !window.google.maps) return;
-  // Aguarda a biblioteca routes
+
+  let attempts = 0;
   const waitForRoutes = setInterval(() => {
+    attempts++;
+    // Verifica se a Routes API já foi carregada
     if (google.maps.routes && google.maps.routes.TravelMode) {
       clearInterval(waitForRoutes);
-      window.map = new google.maps.Map(mapEl, { center: { lat: -23.55, lng: -46.63 }, zoom: 8 });
-      window.geocoder = new google.maps.Geocoder();
-      map = window.map;
-      geocoder = window.geocoder;
-      console.log("Google Maps e Routes API carregados com sucesso");
+      // Agora sim, inicializa o mapa
+      if (mapEl) {
+        window.map = new google.maps.Map(mapEl, { center: { lat: -23.55, lng: -46.63 }, zoom: 8 });
+        window.geocoder = new google.maps.Geocoder();
+        map = window.map;
+        geocoder = window.geocoder;
+        console.log("Google Maps e Routes API carregados com sucesso");
+      }
+    } else if (attempts > 50) { // timeout após ~5 segundos (100ms * 50)
+      clearInterval(waitForRoutes);
+      console.error("Routes API não carregou a tempo.");
+      if (mapEl) mapEl.innerHTML = "Erro: Routes API não disponível. Verifique sua chave e as APIs ativadas.";
     }
   }, 100);
 };
