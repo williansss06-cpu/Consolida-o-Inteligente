@@ -298,7 +298,6 @@ function tipoDoVeiculo(nome) {
   return "OUTRO";
 }
 
-// NOVA função de escolha com retorno detalhado
 function escolherVeiculoParaCarga(pedidosDaCarga) {
   if (!pedidosDaCarga.length) return null;
 
@@ -308,11 +307,9 @@ function escolherVeiculoParaCarga(pedidosDaCarga) {
   const maiorItem = getMaiorItemDaCarga(pedidosDaCarga);
   const tipoIdeal = definirTipoVeiculoPorVolume(volumeTotal);
 
-  // 1. Busca veículos do tipo ideal
   let candidatos = vehicles.filter(v => tipoDoVeiculo(v.nome) === tipoIdeal);
   if (!candidatos.length) candidatos = [...vehicles];
 
-  // 2. Tenta usar um veículo do tipo ideal
   for (let v of candidatos) {
     let motivo = null;
     if (!cabeNoVeiculoPorDimensao(maiorItem, v)) motivo = `dimensão (item ${formatNumber(maiorItem.altura)}x${formatNumber(maiorItem.largura)}x${formatNumber(maiorItem.profundidade)}m não cabe em ${v.nome})`;
@@ -324,12 +321,10 @@ function escolherVeiculoParaCarga(pedidosDaCarga) {
     }
   }
 
-  // 3. Se não deu certo, quebra a regra e tenta qualquer veículo (ordem crescente)
   const ordenados = [...vehicles].sort((a,b)=> a.volumeMax - b.volumeMax);
   for (let v of ordenados) {
     if (!cabeNoVeiculoPorDimensao(maiorItem, v)) continue;
     if (pesoTotal <= v.pesoMax && volumeTotal <= v.volumeMax && notasTotal <= v.notasMax) {
-      // Descobre qual restrição falhou no veículo ideal
       let motivoFalha = null;
       const ideal = candidatos[0] || vehicles[0];
       if (ideal && !cabeNoVeiculoPorDimensao(maiorItem, ideal)) motivoFalha = `dimensão do maior item`;
@@ -439,6 +434,7 @@ function agruparPedidosPorOS(linhas){
 
 function obterChaveAgrupamento(p) { const uf = normalizarTexto(p.uf).toUpperCase(), cidade = normalizarTexto(p.cidade).toUpperCase(), cep = (p.cep || "").replace(/\D/g, ""); const cidadesLitoral = ["SANTOS","GUARUJA","SAO VICENTE","PRAIA GRANDE"]; if (uf === "SP" && cidadesLitoral.includes(cidade)) return "LITORAL_SP"; if (uf === "SP" && cep.length >= 5 && isCapitalOuGrandeSP(cep)) return "SP_CAPITAL"; if (uf === "SP") { const regiao = definirRegiaoSP(cidade); if (regiao && REGIOES_SP[regiao]) { const integracao = REGIOES_SP[regiao].integracaoCorredor; return integracao || regiao; } return "SP_INTERIOR"; } const corredor = identificarCorredor(uf, cidade); return corredor || "OUTROS"; }
 
+// ==================== FATOR DECISÓRIO CORRIGIDO ====================
 function gerarFatorDecisorio(pedidosDaCarga, veiculoObj, grupoChave) {
   const veiculo = veiculoObj.veiculo;
   const regra = veiculoObj.regra;
@@ -457,23 +453,35 @@ function gerarFatorDecisorio(pedidosDaCarga, veiculoObj, grupoChave) {
   const pctPeso = (peso / veiculo.pesoMax) * 100;
   const pctVolume = (m3 / veiculo.volumeMax) * 100;
   const pctNotas = (notas / veiculo.notasMax) * 100;
+
   let motivoPrincipal = "";
-  if (pctVolume >= pctPeso && pctVolume >= pctNotas) {
-    motivoPrincipal = `cubagem total de ${formatNumber(m3)} m³ (${Math.round(pctVolume)}% da capacidade)`;
-  } else if (pctPeso >= pctVolume && pctPeso >= pctNotas) {
-    motivoPrincipal = `peso total de ${formatNumber(peso)} kg (${Math.round(pctPeso)}% da capacidade)`;
+  let complemento = "";
+
+  if (regra === "cubagem") {
+    // A escolha foi pela regra de cubagem
+    const faixa = REGRAS.cubagem.find(r => r.tipo === tipoIdeal);
+    motivoPrincipal = `regra de cubagem (${tipoIdeal} – até ${faixa.max} m³)`;
+    complemento = ` | Ocupação: ${pctVolume.toFixed(0)}% do volume (${formatNumber(m3)} m³ / ${formatNumber(veiculo.volumeMax)} m³)`;
   } else {
-    motivoPrincipal = `quantidade de ${notas} notas fiscais (${Math.round(pctNotas)}% da capacidade)`;
+    // Exceção: o veículo ideal não atendeu a alguma restrição
+    if (motivoFalha) {
+      motivoPrincipal = `exceção: ${motivoFalha}`;
+    } else {
+      // fallback: destaca o recurso mais crítico
+      if (pctVolume >= pctPeso && pctVolume >= pctNotas) {
+        motivoPrincipal = `volume (${Math.round(pctVolume)}% da capacidade)`;
+      } else if (pctPeso >= pctVolume && pctPeso >= pctNotas) {
+        motivoPrincipal = `peso (${Math.round(pctPeso)}% da capacidade)`;
+      } else {
+        motivoPrincipal = `notas (${Math.round(pctNotas)}% da capacidade)`;
+      }
+    }
+    complemento = "";
   }
 
-  let explicacaoRegra = "";
-  if (regra === "cubagem") {
-    explicacaoRegra = `Regra de cubagem: ${tipoIdeal} (até ${REGRAS.cubagem.find(r=>r.tipo===tipoIdeal).max} m³)`;
-  } else {
-    explicacaoRegra = `Exceção: o veículo ideal (${tipoIdeal}) não atendeu devido a ${motivoFalha}.`;
-  }
   const motivoDimensao = `Maior item ${formatNumber(maiorItem.altura)} x ${formatNumber(maiorItem.largura)} x ${formatNumber(maiorItem.profundidade)} m → veículo mínimo ${veiculo?.nome||"não encontrado"}`;
-  const textoFinal = `Veículo escolhido devido à ${motivoPrincipal}. ${motivoDimensao} (${explicacaoRegra})`;
+  const textoFinal = `Veículo escolhido devido à ${motivoPrincipal}. ${motivoDimensao}${complemento}`;
+
   return {
     maiorItem,
     motivoDimensao: textoFinal,
