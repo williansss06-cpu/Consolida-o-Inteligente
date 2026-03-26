@@ -1531,8 +1531,9 @@ function loadGoogleMaps() {
     return;
   }
 
-  // Se a API já foi carregada (ex: recarregou a página)
+  // Se já temos o google maps carregado, tenta inicializar direto
   if (window.google && window.google.maps) {
+    // Aguarda a Routes API (similar ao teste)
     const waitForRoutes = setInterval(() => {
       if (google.maps.routes && google.maps.routes.TravelMode) {
         clearInterval(waitForRoutes);
@@ -1548,7 +1549,7 @@ function loadGoogleMaps() {
     return;
   }
 
-  // Primeira carga: define callback e insere script
+  // Define o callback que será executado quando a API carregar
   window.initMapCallback = function() {
     const mapEl = document.getElementById("map");
     if (!window.google || !window.google.maps) return;
@@ -1565,7 +1566,7 @@ function loadGoogleMaps() {
           geocoder = window.geocoder;
           console.log("Google Maps e Routes API carregados com sucesso");
         }
-      } else if (attempts > 100) {
+      } else if (attempts > 50) {
         clearInterval(waitForRoutes);
         console.error("Routes API não carregou a tempo.");
         if (mapEl) mapEl.innerHTML = "Erro: Routes API não disponível. Verifique sua chave e as APIs ativadas.";
