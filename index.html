@@ -549,6 +549,11 @@ function calcularDistancia(lat1,lng1,lat2,lng2){ if([lat1,lng1,lat2,lng2].some(v
 
 // ========== NOVA FUNÇÃO DESENHAR ROTAS COM ROUTES API ==========
 async function desenharRotas(rotas, origem) {
+  if (!google.maps.routes || !google.maps.routes.TravelMode) {
+    console.warn("Routes API ainda não carregada. Tentando novamente em 1 segundo...");
+    setTimeout(() => desenharRotas(rotas, origem), 1000);
+    return;
+}
   if (!map || !geocoder) return;
   clearRoutes();
   let origin = await geocodeAddress(origem);
@@ -1536,14 +1541,23 @@ function loadGoogleMaps() {
     return;
   }
   window.initMapCallback = function() {
-    if (mapEl && window.google && window.google.maps) {
-      window.map = new google.maps.Map(mapEl, { center: depotCoords || { lat: -23.55, lng: -46.63 }, zoom: 8 });
+  if (!window.google || !window.google.maps) return;
+  // Aguarda a biblioteca routes
+  const waitForRoutes = setInterval(() => {
+    if (google.maps.routes && google.maps.routes.TravelMode) {
+      clearInterval(waitForRoutes);
+      window.map = new google.maps.Map(mapEl, { center: { lat: -23.55, lng: -46.63 }, zoom: 8 });
       window.geocoder = new google.maps.Geocoder();
       map = window.map;
       geocoder = window.geocoder;
-      console.log("Google Maps carregado com sucesso");
+      console.log("Google Maps e Routes API carregados com sucesso");
     }
-  };
+  }, 100);
+};
+Com essas alterações, o código aguardará a biblioteca routes ser completamente carregada antes de desenhar as rotas, eliminando o erro "Cannot read properties of undefined (reading 'DRIVE')".
+
+Esta resposta é gerada por AI, apenas para referência.
+
   const script = document.createElement("script");
   script.src = `https://maps.googleapis.com/maps/api/js?key=${APP_CONFIG.GOOGLE_API_KEY}&libraries=places,routes,geometry&callback=initMapCallback`;
   script.async = true;
