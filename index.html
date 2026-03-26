@@ -41,6 +41,8 @@
     .batch-sim-table { width: 100%; font-size: 12px; margin-top: 10px; border-collapse: collapse; }
     .batch-sim-table th, .batch-sim-table td { border: 1px solid var(--line); padding: 6px; text-align: left; }
     .batch-sim-table th { background: #eef2f7; }
+    .oportunidade-card { background: #fff3e0; border-left: 4px solid #f59e0b; padding: 12px; margin-bottom: 10px; border-radius: 8px; transition: 0.2s; }
+    .oportunidade-card:hover { background: #ffedcc; }
     @media (max-width:1200px){.metrics{grid-template-columns:repeat(4,minmax(0,1fr))}.grid-7{grid-template-columns:repeat(4,minmax(0,1fr))}.grid-5,.grid-4,.grid-3{grid-template-columns:repeat(2,minmax(0,1fr))}.map-side-grid{grid-template-columns:1fr}}
     @media (max-width:768px){.app{flex-direction:column}.sidebar{width:100%;height:auto;position:relative}.metrics,.grid-2,.grid-3,.grid-4,.grid-5,.grid-6,.grid-7{grid-template-columns:1fr}}
   </style>
@@ -51,6 +53,7 @@
     <div class="brand"><span>🚚</span> Frete PRO TMS</div>
     <button class="nav-btn active" onclick="showTab('parametros', this)">Parâmetros</button>
     <button class="nav-btn" onclick="showTab('pedidos', this)">Pedidos</button>
+    <button class="nav-btn" onclick="showTab('central', this)">📋 Central de Pedidos</button>
     <button class="nav-btn" onclick="showTab('simulador', this)">🚛 Simulador</button>
     <button class="nav-btn" onclick="showTab('api', this)">🔌 API</button>
     <button class="nav-btn" onclick="showTab('planejamento', this)">📊 Planejamento</button>
@@ -145,6 +148,33 @@
       </div>
     </section>
 
+    <!-- CENTRAL DE PEDIDOS (com IA de oportunidades) -->
+    <section id="central" class="tab">
+      <div class="card">
+        <div class="row" style="justify-content: space-between;">
+          <h2>📋 Central de Pedidos</h2>
+          <div>
+            <button class="btn btn-purple" onclick="atualizarCentral()">🔄 Atualizar</button>
+            <button class="btn btn-blue" onclick="analisarOportunidadesConsolidacao()">🤖 Buscar Oportunidades</button>
+          </div>
+        </div>
+        <p class="small">Todos os pedidos da empresa (independente de depositante) que ainda não foram alocados em rotas ou enviados para operação.</p>
+        <div class="table-wrap">
+          <table style="font-size:12px;">
+            <thead>
+              <tr><th>OS</th><th>Cód. Depositante</th><th>Depositante</th><th>CNPJ</th><th>Destinatário</th><th>CEP</th><th>Logradouro</th><th>Número</th><th>Bairro</th><th>Cidade</th><th>UF</th><th>Peso Bruto</th><th>Metrocúbico</th><th>Data Previsão</th><th>Modalidade</th></tr>
+            </thead>
+            <tbody id="centralTableBody"><tr><td colspan="15">Carregando...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="card">
+        <h3>🤖 Oportunidades de Consolidação</h3>
+        <div id="oportunidadesList"><div class="inline-alert">Clique em "Buscar Oportunidades" para analisar pedidos pendentes e sugerir inclusão em rotas existentes.</div></div>
+        <p class="small">A IA verifica automaticamente a cada 5 minutos (ou manualmente) e sugere onde um pedido pode ser adicionado, respeitando corredor, capacidade, distância e regras operacionais.</p>
+      </div>
+    </section>
+
     <!-- SIMULADOR (com suporte a lote) -->
     <section id="simulador" class="tab">
       <div class="card">
@@ -167,7 +197,6 @@
         <div id="simulacaoResultado" class="simulacao-resultado" style="display:none;"></div>
         <div id="sugestoesInclusao" style="margin-top:15px;"></div>
       </div>
-
       <div class="card">
         <h3>📤 Simulação em Lote (CSV / API)</h3>
         <div class="grid grid-2">
@@ -187,7 +216,6 @@
         <div id="batchResultado" style="margin-top:15px;"></div>
         <div class="inline-alert">📄 <strong>PDF:</strong> Não suportado diretamente. Converta para CSV utilizando ferramentas externas.</div>
       </div>
-
       <div class="card">
         <h3>⭐ Simulações Favoritas</h3>
         <div id="simulacoesFavoritas"></div>
@@ -268,294 +296,10 @@ let directionsRenderers = [];
 let geocodeCache = {};
 let ultimoResultado = null;
 let depotCoords = null;
-
-// ==================== SIMULADOR (ISOLADO) ====================
+let oportunidadesAtuais = [];
 let simulacoesFavoritas = [];
 
-function carregarFavoritas() {
-  try {
-    const saved = localStorage.getItem("fretepro_simulacoes_favoritas");
-    if(saved) simulacoesFavoritas = JSON.parse(saved);
-    renderFavoritas();
-  } catch(e) { simulacoesFavoritas = []; }
-}
-function salvarFavoritasStorage() {
-  localStorage.setItem("fretepro_simulacoes_favoritas", JSON.stringify(simulacoesFavoritas));
-}
-function renderFavoritas() {
-  const div = document.getElementById("simulacoesFavoritas");
-  if(!div) return;
-  if(simulacoesFavoritas.length === 0) {
-    div.innerHTML = "<div class='small'>Nenhuma simulação favorita salva.</div>";
-    return;
-  }
-  div.innerHTML = simulacoesFavoritas.map((fav, idx) => `
-    <div class="simulacao-favorito" onclick="carregarFavorita(${idx})">
-      <strong>${fav.nome || `Simulação ${idx+1}`}</strong><br>
-      <span class="small">${fav.cliente || '-'} → ${fav.destinatario || '-'} | ${fav.endereco?.substring(0,50) || '-'}</span>
-    </div>
-  `).join('');
-}
-function salvarSimulacaoFavorita() {
-  const nome = prompt("Nome para esta simulação (ex: Cliente X - Cidade Y):", "Simulação " + (simulacoesFavoritas.length+1));
-  if(!nome) return;
-  const sim = {
-    nome: nome,
-    cliente: document.getElementById("simCliente").value,
-    destinatario: document.getElementById("simDestinatario").value,
-    endereco: document.getElementById("simEndereco").value,
-    peso: document.getElementById("simPeso").value,
-    volume: document.getElementById("simVolume").value,
-    cubagem: document.getElementById("simCubagem").value
-  };
-  simulacoesFavoritas.push(sim);
-  salvarFavoritasStorage();
-  renderFavoritas();
-  alert("Simulação salva como favorita!");
-}
-function carregarFavorita(idx) {
-  const fav = simulacoesFavoritas[idx];
-  if(!fav) return;
-  document.getElementById("simCliente").value = fav.cliente || "";
-  document.getElementById("simDestinatario").value = fav.destinatario || "";
-  document.getElementById("simEndereco").value = fav.endereco || "";
-  document.getElementById("simPeso").value = fav.peso || "";
-  document.getElementById("simVolume").value = fav.volume || "";
-  document.getElementById("simCubagem").value = fav.cubagem || "";
-  simularFrete();
-}
-function limparSimulador() {
-  document.getElementById("simCliente").value = "";
-  document.getElementById("simDestinatario").value = "";
-  document.getElementById("simEndereco").value = "";
-  document.getElementById("simPeso").value = "";
-  document.getElementById("simVolume").value = "";
-  document.getElementById("simCubagem").value = "";
-  document.getElementById("simulacaoResultado").style.display = "none";
-  document.getElementById("sugestoesInclusao").innerHTML = "";
-  setStatus("Campos do simulador limpos", "info");
-}
-function limparFavoritas() {
-  if(confirm("Limpar todas as simulações favoritas?")) {
-    simulacoesFavoritas = [];
-    salvarFavoritasStorage();
-    renderFavoritas();
-  }
-}
-
-// ==================== SIMULAÇÃO EM LOTE ====================
-async function simularLoteCSV() {
-  const fileInput = document.getElementById("batchCsvFile");
-  const file = fileInput.files[0];
-  if(!file) { alert("Selecione um arquivo CSV"); return; }
-  Papa.parse(file, {
-    header: true,
-    skipEmptyLines: true,
-    complete: async (res) => {
-      if(!res.data || !res.data.length) { alert("Arquivo vazio ou inválido"); return; }
-      await processarLoteSimulacao(res.data);
-    },
-    error: (err) => { alert("Erro ao ler CSV: "+err.message); }
-  });
-}
-async function simularLoteAPI() {
-  const url = document.getElementById("batchApiUrl").value;
-  if(!url) { alert("Informe a URL da API"); return; }
-  setStatus("Buscando lote via API...", "warn");
-  try {
-    const response = await fetch(url);
-    if(!response.ok) throw new Error(`HTTP ${response.status}`);
-    const dados = await response.json();
-    if(!Array.isArray(dados)) throw new Error("Resposta não é um array");
-    await processarLoteSimulacao(dados);
-  } catch(err) {
-    alert("Erro ao buscar lote: "+err.message);
-    setStatus(`Erro: ${err.message}`, "err");
-  }
-}
-async function processarLoteSimulacao(linhas) {
-  if(!geocoder) { alert("Mapa não carregado. Aguarde a inicialização."); return; }
-  setStatus("Processando lote de simulação...", "warn");
-  const resultados = [];
-  let ok = 0, erro = 0;
-  for(let i=0; i<linhas.length; i++) {
-    const row = linhas[i];
-    const endereco = row.endereco || row.Endereco || row.ENDERECO || "";
-    const peso = parseFloat(row.peso || row.Peso || row.PESO || 0);
-    let volume = parseFloat(row.volume || row.Volume || row.VOLUME || 0);
-    const cubagem = parseFloat(row.cubagem || row.Cubagem || row.CUBAGEM || 0);
-    const cliente = row.cliente || row.Cliente || row.CLIENTE || "";
-    const destinatario = row.destinatario || row.Destinatario || row.DESTINATARIO || "";
-    if(!endereco) { resultados.push({ linha: i+1, ok: false, motivo: "Endereço ausente" }); erro++; continue; }
-    let volumeCalculado = cubagem>0 ? cubagem : volume;
-    if(volumeCalculado<=0 && peso>0) {
-      const fator = parseFloat(document.getElementById("fatorCubagem")?.value || 0.003);
-      volumeCalculado = Math.max(peso * fator, 0.01);
-    }
-    if(volumeCalculado<=0) { resultados.push({ linha: i+1, ok: false, motivo: "Volume inválido" }); erro++; continue; }
-    try {
-      const coord = await geocodeAddress(endereco);
-      if(!coord) throw new Error("Endereço não geocodificado");
-      const depot = document.getElementById("depot").value;
-      const origemCoord = await geocodeAddress(depot);
-      const distancia = calcularDistancia(origemCoord.lat, origemCoord.lng, coord.lat, coord.lng);
-      const pedidoSimulado = {
-        pesoTotal: peso,
-        volumeTotal: volumeCalculado,
-        numNotas: 1,
-        items: [{ altura: 0.5, largura: 0.5, profundidade: 0.5, dimCritica: 0.5 }],
-        exclusivo: false,
-        cubagemAuto: volume<=0 && cubagem<=0
-      };
-      const veiculoObj = escolherVeiculoParaCarga([pedidoSimulado]);
-      const veiculo = veiculoObj ? veiculoObj.veiculo : null;
-      const ocupacao = veiculo ? (volumeCalculado / veiculo.volumeMax) * 100 : 0;
-      const custo = veiculo ? distancia * veiculo.custoKm : 0;
-      resultados.push({
-        linha: i+1, ok: true, cliente, destinatario, endereco, distancia, peso, volume: volumeCalculado,
-        veiculo: veiculo ? veiculo.nome : "Nenhum", ocupacao, custo
-      });
-      ok++;
-    } catch(e) {
-      resultados.push({ linha: i+1, ok: false, motivo: e.message });
-      erro++;
-    }
-  }
-  renderLoteResultados(resultados);
-  setStatus(`Lote processado: ${ok} sucesso, ${erro} erros`, "ok");
-}
-function renderLoteResultados(resultados) {
-  const div = document.getElementById("batchResultado");
-  if(!div) return;
-  if(!resultados.length) { div.innerHTML = "<div class='inline-alert'>Nenhum resultado</div>"; return; }
-  let html = `<h3>📊 Resultados da Simulação em Lote</h3>
-  <div class="table-wrap"><table class="batch-sim-table">
-    <thead><tr><th>Linha</th><th>Cliente</th><th>Destinatário</th><th>Distância (km)</th><th>Peso (kg)</th><th>Volume (m³)</th><th>Veículo</th><th>Ocupação</th><th>Custo (R$)</th><th>Status</th></tr></thead><tbody>`;
-  for(let r of resultados) {
-    if(r.ok) {
-      html += `<tr>
-        <td>${r.linha}</td><td>${r.cliente||"-"}</td><td>${r.destinatario||"-"}</td>
-        <td>${r.distancia.toFixed(1)}</td><td>${formatNumber(r.peso)}</td><td>${formatNumber(r.volume)}</td>
-        <td>${r.veiculo}</td><td>${r.ocupacao.toFixed(0)}%</td><td>${formatCurrency(r.custo)}</td>
-        <td class="ok">✅ Ok</td>
-      </tr>`;
-    } else {
-      html += `<tr>
-        <td>${r.linha}</td><td colspan="8">❌ Erro: ${r.motivo}</td>
-        <td class="err">Falha</td>
-      </tr>`;
-    }
-  }
-  html += `</tbody></table></div>`;
-  div.innerHTML = html;
-}
-
-// ==================== ANÁLISE DE INCLUSÃO EM ROTAS EXISTENTES ====================
-async function analisarInclusaoEmRotas() {
-  if(!ultimoResultado || !ultimoResultado.rotas || ultimoResultado.rotas.length === 0) {
-    alert("Não há rotas planejadas. Execute o planejamento primeiro na aba 'Planejamento'.");
-    return;
-  }
-  const endereco = document.getElementById("simEndereco").value;
-  const peso = parseFloat(document.getElementById("simPeso").value) || 0;
-  let volume = parseFloat(document.getElementById("simVolume").value) || 0;
-  const cubagem = parseFloat(document.getElementById("simCubagem").value);
-  const volumeFinal = cubagem > 0 ? cubagem : volume;
-  let volumeCalculado = volumeFinal;
-  if(volumeFinal <= 0 && peso > 0) {
-    const fator = parseFloat(document.getElementById("fatorCubagem")?.value || 0.003);
-    volumeCalculado = Math.max(peso * fator, 0.01);
-  }
-  if(volumeCalculado <= 0) { alert("Volume inválido"); return; }
-  if(!endereco) { alert("Informe o endereço de destino"); return; }
-  setStatus("Analisando rotas existentes...", "warn");
-  try {
-    if(!geocoder) { alert("Mapa não carregado."); return; }
-    const coordDestino = await geocodeAddress(endereco);
-    if(!coordDestino) throw new Error("Endereço inválido");
-    const depot = document.getElementById("depot").value;
-    const origemCoord = await geocodeAddress(depot);
-    const pedidoSimulado = {
-      cidade: "Simulado",
-      uf: "XX",
-      lat: coordDestino.lat,
-      lng: coordDestino.lng,
-      pesoTotal: peso,
-      volumeTotal: volumeCalculado,
-      numNotas: 1,
-      grupoConsolidado: "OUTROS",
-      exclusivo: false
-    };
-    const raioKm = parseFloat(document.getElementById("cfgRaioKm").value) || 80;
-    const sugestoes = [];
-    for(let rota of ultimoResultado.rotas) {
-      const veiculo = rota.veiculo;
-      if(!veiculo) continue;
-      const volumeDisponivel = veiculo.volumeMax - rota.volumeTotal;
-      const pesoDisponivel = veiculo.pesoMax - rota.pesoTotal;
-      const notasDisponivel = veiculo.notasMax - rota.numNotas;
-      if(volumeDisponivel < volumeCalculado || pesoDisponivel < peso || notasDisponivel < 1) continue;
-      let corredorOk = false;
-      let pedidoRef = null;
-      for(let p of rota.pedidos) {
-        if(podeConsolidar(p, pedidoSimulado)) {
-          corredorOk = true;
-          pedidoRef = p;
-          break;
-        }
-      }
-      if(!corredorOk) continue;
-      let distanciaOk = true;
-      for(let p of rota.pedidos) {
-        if(calcularDistancia(p.lat, p.lng, coordDestino.lat, coordDestino.lng) > raioKm) {
-          distanciaOk = false;
-          break;
-        }
-      }
-      if(!distanciaOk) continue;
-      const ocupacaoAtual = (rota.volumeTotal / veiculo.volumeMax) * 100;
-      const ocupacaoNova = ((rota.volumeTotal + volumeCalculado) / veiculo.volumeMax) * 100;
-      const distanciaExtra = calcularDistancia(pedidoRef.lat, pedidoRef.lng, coordDestino.lat, coordDestino.lng);
-      sugestoes.push({
-        rotaId: rota.id,
-        rotaIndex: ultimoResultado.rotas.findIndex(r => r.id === rota.id) + 1,
-        nomeCorredor: rota.nomeCorredor,
-        veiculo: veiculo.nome,
-        volumeDisponivel,
-        pesoDisponivel,
-        distanciaExtra,
-        ocupacaoAtual,
-        ocupacaoNova
-      });
-    }
-    sugestoes.sort((a,b) => b.ocupacaoNova - a.ocupacaoNova);
-    const div = document.getElementById("sugestoesInclusao");
-    if(sugestoes.length === 0) {
-      div.innerHTML = `<div class="inline-alert">⚠️ Nenhuma rota compatível com corredor, distância ou espaço disponível.</div>`;
-    } else {
-      div.innerHTML = `<h3>🚛 Sugestões de Inclusão (${sugestoes.length} rotas compatíveis)</h3>`;
-      div.innerHTML += sugestoes.map(s => `
-        <div class="sugestao-inclusao">
-          <strong>📦 Rota ${s.rotaIndex} - ${s.nomeCorredor}</strong><br>
-          <span>Veículo: ${s.veiculo}</span><br>
-          <span>📊 Ocupação atual: ${s.ocupacaoAtual.toFixed(0)}% → após inclusão: ${s.ocupacaoNova.toFixed(0)}%</span><br>
-          <span>✅ Espaço disponível: ${s.volumeDisponivel.toFixed(2)} m³ / ${s.pesoDisponivel.toFixed(0)} kg</span><br>
-          <span>📍 Distância adicional: ${s.distanciaExtra.toFixed(1)} km</span><br>
-          <span class="pill ${s.ocupacaoNova > 90 ? 'pill-yellow' : (s.ocupacaoNova > 70 ? 'pill-blue' : 'pill-green')}">
-            ${s.ocupacaoNova > 90 ? '⚠️ Próximo do limite' : (s.ocupacaoNova > 70 ? '📦 Bom aproveitamento' : '✅ Pode consolidar')}
-          </span>
-        </div>
-      `).join('');
-    }
-    setStatus(`Análise concluída: ${sugestoes.length} rotas compatíveis`, "ok");
-  } catch(err) {
-    console.error(err);
-    alert("Erro na análise: " + err.message);
-    setStatus(`Erro: ${err.message}`, "err");
-  }
-}
-
-// ==================== FUNÇÕES AUXILIARES (PRESERVADAS) ====================
+// ==================== FUNÇÕES AUXILIARES ====================
 function setTextSafe(id, value) { const el = document.getElementById(id); if (el) el.textContent = value; }
 function normalizarTexto(t) { return (t||"").toString().normalize("NFD").replace(/[\u0300-\u036f]/g,"").trim(); }
 function formatNumber(v) { return v || v===0 ? Number(v).toLocaleString("pt-BR",{minimumFractionDigits:0,maximumFractionDigits:2}) : "-"; }
@@ -567,6 +311,7 @@ function showTab(tabId,btn=null){
   document.querySelectorAll(".nav-btn").forEach(b=>b.classList.remove("active")); 
   if(btn) btn.classList.add("active");
   if (tabId === "resultado") atualizarMetricas();
+  if (tabId === "central") { renderCentral(); analisarOportunidadesConsolidacao(); }
 }
 function setStatus(msg,type=""){ let el=document.getElementById("statusPlanejamento"); if(el){ el.className=`status ${type}`; el.innerHTML=msg; } }
 function setStatusBanco(msg,type=""){ let el=document.getElementById("statusBanco"); if(el){ el.className=`status ${type}`; el.innerHTML=msg; } }
@@ -624,6 +369,9 @@ function tipoDoVeiculo(nome) {
   if (n.includes("carreta")) return "CARRETA";
   return "OUTRO";
 }
+function cabeNoVeiculoPorDimensao(item, veiculo) { return (item.altura||0) <= (veiculo.alturaMax||0) && (item.largura||0) <= (veiculo.larguraMax||0) && (item.profundidade||0) <= (veiculo.profundidadeMax||0); }
+
+// FUNÇÃO CORRIGIDA: escolhe veículo respeitando faixa de cubagem; só quebra por dimensão
 function escolherVeiculoParaCarga(pedidosDaCarga) {
   if (!pedidosDaCarga.length) return null;
   const pesoTotal = pedidosDaCarga.reduce((s,p)=>s+p.pesoTotal,0);
@@ -631,42 +379,41 @@ function escolherVeiculoParaCarga(pedidosDaCarga) {
   const notasTotal = pedidosDaCarga.reduce((s,p)=>s+p.numNotas,0);
   const maiorItem = getMaiorItemDaCarga(pedidosDaCarga);
   const tipoIdeal = definirTipoVeiculoPorVolume(volumeTotal);
-  let candidatos = vehicles.filter(v => tipoDoVeiculo(v.nome) === tipoIdeal);
-  if (!candidatos.length) candidatos = [...vehicles];
-  for (let v of candidatos) {
-    let motivo = null;
-    if (!cabeNoVeiculoPorDimensao(maiorItem, v)) motivo = `dimensão (item ${formatNumber(maiorItem.altura)}x${formatNumber(maiorItem.largura)}x${formatNumber(maiorItem.profundidade)}m não cabe em ${v.nome})`;
-    else if (pesoTotal > v.pesoMax) motivo = `peso (${formatNumber(pesoTotal)} kg > ${formatNumber(v.pesoMax)} kg)`;
-    else if (volumeTotal > v.volumeMax) motivo = `volume (${formatNumber(volumeTotal)} m³ > ${formatNumber(v.volumeMax)} m³)`;
-    else if (notasTotal > v.notasMax) motivo = `notas (${notasTotal} > ${v.notasMax})`;
-    if (!motivo) return { veiculo: v, regra: "cubagem", tipoIdeal, motivo: null };
+
+  let candidatosIdeal = vehicles.filter(v => tipoDoVeiculo(v.nome) === tipoIdeal);
+  if (!candidatosIdeal.length) candidatosIdeal = [...vehicles];
+
+  // tenta veículo do tipo ideal que atenda todas as restrições
+  for (let v of candidatosIdeal) {
+    if (!cabeNoVeiculoPorDimensao(maiorItem, v)) continue;
+    if (pesoTotal <= v.pesoMax && volumeTotal <= v.volumeMax && notasTotal <= v.notasMax) {
+      return { veiculo: v, regra: "cubagem", tipoIdeal, motivo: null };
+    }
   }
+
+  // verifica se o maior item cabe em algum veículo do tipo ideal (apenas dimensão)
+  const algumCabeDimensao = candidatosIdeal.some(v => cabeNoVeiculoPorDimensao(maiorItem, v));
+  if (algumCabeDimensao) {
+    // se cabe, mas falhou por peso/volume/notas -> NÃO aloca (mantém a carga pendente)
+    return null;
+  }
+
+  // Exceção: maior item não cabe no tipo ideal -> busca qualquer veículo
   const ordenados = [...vehicles].sort((a,b)=> a.volumeMax - b.volumeMax);
   for (let v of ordenados) {
     if (!cabeNoVeiculoPorDimensao(maiorItem, v)) continue;
     if (pesoTotal <= v.pesoMax && volumeTotal <= v.volumeMax && notasTotal <= v.notasMax) {
-      let motivoFalha = null;
-      const ideal = candidatos[0] || vehicles[0];
-      if (ideal && !cabeNoVeiculoPorDimensao(maiorItem, ideal)) motivoFalha = `dimensão do maior item`;
-      else if (ideal && pesoTotal > ideal.pesoMax) motivoFalha = `peso (${formatNumber(pesoTotal)} kg > ${formatNumber(ideal.pesoMax)} kg)`;
-      else if (ideal && volumeTotal > ideal.volumeMax) motivoFalha = `volume (${formatNumber(volumeTotal)} m³ > ${formatNumber(ideal.volumeMax)} m³)`;
-      else if (ideal && notasTotal > ideal.notasMax) motivoFalha = `notas (${notasTotal} > ${ideal.notasMax})`;
-      else motivoFalha = `restrição de capacidade`;
-      return { veiculo: v, regra: "excecao", tipoIdeal, motivo: motivoFalha };
+      return { veiculo: v, regra: "excecao", tipoIdeal, motivo: `dimensão do maior item (não cabia em ${tipoIdeal})` };
     }
   }
   return null;
 }
 
 function podeConsolidar(p1, p2) {
-  if (p1.grupoConsolidado === "LITORAL_SP" || p2.grupoConsolidado === "LITORAL_SP") {
-    return p1.grupoConsolidado === p2.grupoConsolidado;
-  }
+  if (p1.grupoConsolidado === "LITORAL_SP" || p2.grupoConsolidado === "LITORAL_SP") return p1.grupoConsolidado === p2.grupoConsolidado;
   if (p1.grupoConsolidado === p2.grupoConsolidado) return true;
   if (document.getElementById("regraCapitalFlex")?.checked &&
-      (p1.grupoConsolidado === "SP_CAPITAL" || p2.grupoConsolidado === "SP_CAPITAL")) {
-    return true;
-  }
+      (p1.grupoConsolidado === "SP_CAPITAL" || p2.grupoConsolidado === "SP_CAPITAL")) return true;
   return identificarCorredor(p1.uf, p1.cidade) === identificarCorredor(p2.uf, p2.cidade);
 }
 
@@ -678,22 +425,12 @@ function motivoNaoAlocadoCarga(lote) {
   const maiorItem = getMaiorItemDaCarga(lote);
   const veiculosOrdenados = [...vehicles].sort((a,b) => a.volumeMax - b.volumeMax || a.pesoMax - b.pesoMax);
   for (let v of veiculosOrdenados) {
-    if (!cabeNoVeiculoPorDimensao(maiorItem, v)) {
-      return `Item crítico (${formatNumber(maiorItem.altura)}x${formatNumber(maiorItem.largura)}x${formatNumber(maiorItem.profundidade)}m) excede dimensões do veículo ${v.nome}`;
-    }
-    if (pesoTotal > v.pesoMax) return `Peso total ${formatNumber(pesoTotal)} kg excede capacidade do veículo ${v.nome} (máx ${formatNumber(v.pesoMax)} kg)`;
-    if (volumeTotal > v.volumeMax) return `Volume total ${formatNumber(volumeTotal)} m³ excede capacidade do veículo ${v.nome} (máx ${formatNumber(v.volumeMax)} m³)`;
-    if (notasTotal > v.notasMax) return `Número de notas ${notasTotal} excede limite do veículo ${v.nome} (máx ${v.notasMax} notas)`;
+    if (!cabeNoVeiculoPorDimensao(maiorItem, v)) return `Item crítico excede dimensões do veículo ${v.nome}`;
+    if (pesoTotal > v.pesoMax) return `Peso total ${formatNumber(pesoTotal)} kg excede capacidade do veículo ${v.nome}`;
+    if (volumeTotal > v.volumeMax) return `Volume total ${formatNumber(volumeTotal)} m³ excede capacidade do veículo ${v.nome}`;
+    if (notasTotal > v.notasMax) return `Número de notas ${notasTotal} excede limite do veículo ${v.nome}`;
   }
-  let motivos = [];
-  const maxPeso = Math.max(...veiculosOrdenados.map(v => v.pesoMax));
-  const maxVolume = Math.max(...veiculosOrdenados.map(v => v.volumeMax));
-  const maxNotas = Math.max(...veiculosOrdenados.map(v => v.notasMax));
-  if (pesoTotal > maxPeso) motivos.push(`peso (${formatNumber(pesoTotal)} kg > ${formatNumber(maxPeso)} kg)`);
-  if (volumeTotal > maxVolume) motivos.push(`volume (${formatNumber(volumeTotal)} m³ > ${formatNumber(maxVolume)} m³)`);
-  if (notasTotal > maxNotas) motivos.push(`notas (${notasTotal} > ${maxNotas})`);
-  if (motivos.length) return `Carga excede ${motivos.join(' e ')} mesmo nos maiores veículos disponíveis.`;
-  return `Não foi possível alocar: verifique restrições de consolidação ou capacidade.`;
+  return "Não foi possível alocar";
 }
 
 function calcularCubagemInteligente(pesoKg, volumeInformado) { let volume = parseNumero(volumeInformado); if (volume > 0) return volume; const regraAuto = document.getElementById("regraCubagemAuto")?.checked !== false; if (!regraAuto) return 0; const fator = parseFloat(document.getElementById("fatorCubagem")?.value || 0.003); return Math.max(pesoKg * fator, 0.01); }
@@ -731,7 +468,6 @@ function analisarObs(obs){
 }
 function getMaiorItemDoPedido(pedido){ let maior = null; (pedido.items||[]).forEach(item => { const dimCritica = Math.max(item.altura||0, item.largura||0, item.profundidade||0); if (!maior || dimCritica > maior.dimCritica) maior = { ...item, dimCritica }; }); return maior || { altura:0, largura:0, profundidade:0, dimCritica:0 }; }
 function getMaiorItemDaCarga(pedidosDaCarga) { let maior = null; pedidosDaCarga.forEach(p => { const item = getMaiorItemDoPedido(p); if (!maior || (item.dimCritica||0) > (maior.dimCritica||0)) maior = item; }); return maior || { altura:0, largura:0, profundidade:0, dimCritica:0 }; }
-function cabeNoVeiculoPorDimensao(item, veiculo) { return (item.altura||0) <= (veiculo.alturaMax||0) && (item.largura||0) <= (veiculo.larguraMax||0) && (item.profundidade||0) <= (veiculo.profundidadeMax||0); }
 
 function agruparPedidosPorOS(linhas){
   carregarCorredoresDaUI(); let mapa=new Map();
@@ -745,7 +481,6 @@ function agruparPedidosPorOS(linhas){
 
 function obterChaveAgrupamento(p) { const uf = normalizarTexto(p.uf).toUpperCase(), cidade = normalizarTexto(p.cidade).toUpperCase(), cep = (p.cep || "").replace(/\D/g, ""); const cidadesLitoral = ["SANTOS","GUARUJA","SAO VICENTE","PRAIA GRANDE"]; if (uf === "SP" && cidadesLitoral.includes(cidade)) return "LITORAL_SP"; if (uf === "SP" && cep.length >= 5 && isCapitalOuGrandeSP(cep)) return "SP_CAPITAL"; if (uf === "SP") { const regiao = definirRegiaoSP(cidade); if (regiao && REGIOES_SP[regiao]) { const integracao = REGIOES_SP[regiao].integracaoCorredor; return integracao || regiao; } return "SP_INTERIOR"; } const corredor = identificarCorredor(uf, cidade); return corredor || "OUTROS"; }
 
-// ==================== FATOR DECISÓRIO CORRIGIDO ====================
 function gerarFatorDecisorio(pedidosDaCarga, veiculoObj, grupoChave) {
   const veiculo = veiculoObj.veiculo;
   const regra = veiculoObj.regra;
@@ -765,36 +500,24 @@ function gerarFatorDecisorio(pedidosDaCarga, veiculoObj, grupoChave) {
   const pctVolume = (m3 / veiculo.volumeMax) * 100;
   const pctNotas = (notas / veiculo.notasMax) * 100;
 
-  let motivoPrincipal = "";
-  let complemento = "";
-
+  let motivoPrincipal = "", complemento = "";
   if (regra === "cubagem") {
     const faixa = REGRAS.cubagem.find(r => r.tipo === tipoIdeal);
     motivoPrincipal = `regra de cubagem (${tipoIdeal} – até ${faixa.max} m³)`;
     complemento = ` | Ocupação: ${pctVolume.toFixed(0)}% do volume (${formatNumber(m3)} m³ / ${formatNumber(veiculo.volumeMax)} m³)`;
   } else {
-    if (motivoFalha) {
-      motivoPrincipal = `exceção: ${motivoFalha}`;
-    } else {
-      if (pctVolume >= pctPeso && pctVolume >= pctNotas) {
-        motivoPrincipal = `volume (${Math.round(pctVolume)}% da capacidade)`;
-      } else if (pctPeso >= pctVolume && pctPeso >= pctNotas) {
-        motivoPrincipal = `peso (${Math.round(pctPeso)}% da capacidade)`;
-      } else {
-        motivoPrincipal = `notas (${Math.round(pctNotas)}% da capacidade)`;
-      }
-    }
+    if (motivoFalha) motivoPrincipal = `exceção: ${motivoFalha}`;
+    else if (pctVolume >= pctPeso && pctVolume >= pctNotas) motivoPrincipal = `volume (${Math.round(pctVolume)}% da capacidade)`;
+    else if (pctPeso >= pctVolume && pctPeso >= pctNotas) motivoPrincipal = `peso (${Math.round(pctPeso)}% da capacidade)`;
+    else motivoPrincipal = `notas (${Math.round(pctNotas)}% da capacidade)`;
     complemento = "";
   }
-
   const motivoDimensao = `Maior item ${formatNumber(maiorItem.altura)} x ${formatNumber(maiorItem.largura)} x ${formatNumber(maiorItem.profundidade)} m → veículo mínimo ${veiculo?.nome||"não encontrado"}`;
   const textoFinal = `Veículo escolhido devido à ${motivoPrincipal}. ${motivoDimensao}${complemento}`;
-
   return {
     maiorItem,
     motivoDimensao: textoFinal,
-    peso,
-    m3,
+    peso, m3,
     corredor: grupoChave,
     regrasAplicadas: regras,
     observacoes: [`Peso total ${formatNumber(peso)} kg (${Math.round(pctPeso)}%)`, `Volume total ${formatNumber(m3)} m³ (${Math.round(pctVolume)}%)`, `${notas} notas (${Math.round(pctNotas)}%)`]
@@ -815,14 +538,10 @@ function otimizarOrdemRota(pedidos, origemCoords) {
   const rotaOtimizada = [];
   let atual = { lat: origemCoords.lat, lng: origemCoords.lng };
   while (naoVisitados.length > 0) {
-    let menorDist = Infinity;
-    let idxMenor = -1;
+    let menorDist = Infinity, idxMenor = -1;
     for (let i = 0; i < naoVisitados.length; i++) {
       const dist = calcularDistancia(atual.lat, atual.lng, naoVisitados[i].lat, naoVisitados[i].lng);
-      if (dist < menorDist) {
-        menorDist = dist;
-        idxMenor = i;
-      }
+      if (dist < menorDist) { menorDist = dist; idxMenor = i; }
     }
     const prox = naoVisitados[idxMenor];
     rotaOtimizada.push(prox);
@@ -1522,6 +1241,216 @@ async function simularFrete() {
   }
 }
 
+async function analisarInclusaoEmRotas() {
+  if(!ultimoResultado || !ultimoResultado.rotas || ultimoResultado.rotas.length === 0) {
+    alert("Não há rotas planejadas. Execute o planejamento primeiro na aba 'Planejamento'.");
+    return;
+  }
+  const endereco = document.getElementById("simEndereco").value;
+  const peso = parseFloat(document.getElementById("simPeso").value) || 0;
+  let volume = parseFloat(document.getElementById("simVolume").value) || 0;
+  const cubagem = parseFloat(document.getElementById("simCubagem").value);
+  const volumeFinal = cubagem > 0 ? cubagem : volume;
+  let volumeCalculado = volumeFinal;
+  if(volumeFinal <= 0 && peso > 0) {
+    const fator = parseFloat(document.getElementById("fatorCubagem")?.value || 0.003);
+    volumeCalculado = Math.max(peso * fator, 0.01);
+  }
+  if(volumeCalculado <= 0) { alert("Volume inválido"); return; }
+  if(!endereco) { alert("Informe o endereço de destino"); return; }
+  setStatus("Analisando rotas existentes...", "warn");
+  try {
+    if(!geocoder) { alert("Mapa não carregado."); return; }
+    const coordDestino = await geocodeAddress(endereco);
+    if(!coordDestino) throw new Error("Endereço inválido");
+    const depot = document.getElementById("depot").value;
+    const origemCoord = await geocodeAddress(depot);
+    const pedidoSimulado = {
+      cidade: "Simulado",
+      uf: "XX",
+      lat: coordDestino.lat,
+      lng: coordDestino.lng,
+      pesoTotal: peso,
+      volumeTotal: volumeCalculado,
+      numNotas: 1,
+      grupoConsolidado: "OUTROS",
+      exclusivo: false
+    };
+    const raioKm = parseFloat(document.getElementById("cfgRaioKm").value) || 80;
+    const sugestoes = [];
+    for(let rota of ultimoResultado.rotas) {
+      const veiculo = rota.veiculo;
+      if(!veiculo) continue;
+      const volumeDisponivel = veiculo.volumeMax - rota.volumeTotal;
+      const pesoDisponivel = veiculo.pesoMax - rota.pesoTotal;
+      const notasDisponivel = veiculo.notasMax - rota.numNotas;
+      if(volumeDisponivel < volumeCalculado || pesoDisponivel < peso || notasDisponivel < 1) continue;
+      let corredorOk = false;
+      let pedidoRef = null;
+      for(let p of rota.pedidos) {
+        if(podeConsolidar(p, pedidoSimulado)) {
+          corredorOk = true;
+          pedidoRef = p;
+          break;
+        }
+      }
+      if(!corredorOk) continue;
+      let distanciaOk = true;
+      for(let p of rota.pedidos) {
+        if(calcularDistancia(p.lat, p.lng, coordDestino.lat, coordDestino.lng) > raioKm) {
+          distanciaOk = false;
+          break;
+        }
+      }
+      if(!distanciaOk) continue;
+      const ocupacaoAtual = (rota.volumeTotal / veiculo.volumeMax) * 100;
+      const ocupacaoNova = ((rota.volumeTotal + volumeCalculado) / veiculo.volumeMax) * 100;
+      const distanciaExtra = calcularDistancia(pedidoRef.lat, pedidoRef.lng, coordDestino.lat, coordDestino.lng);
+      sugestoes.push({
+        rotaId: rota.id,
+        rotaIndex: ultimoResultado.rotas.findIndex(r => r.id === rota.id) + 1,
+        nomeCorredor: rota.nomeCorredor,
+        veiculo: veiculo.nome,
+        volumeDisponivel,
+        pesoDisponivel,
+        distanciaExtra,
+        ocupacaoAtual,
+        ocupacaoNova
+      });
+    }
+    sugestoes.sort((a,b) => b.ocupacaoNova - a.ocupacaoNova);
+    const div = document.getElementById("sugestoesInclusao");
+    if(sugestoes.length === 0) {
+      div.innerHTML = `<div class="inline-alert">⚠️ Nenhuma rota compatível com corredor, distância ou espaço disponível.</div>`;
+    } else {
+      div.innerHTML = `<h3>🚛 Sugestões de Inclusão (${sugestoes.length} rotas compatíveis)</h3>`;
+      div.innerHTML += sugestoes.map(s => `
+        <div class="sugestao-inclusao">
+          <strong>📦 Rota ${s.rotaIndex} - ${s.nomeCorredor}</strong><br>
+          <span>Veículo: ${s.veiculo}</span><br>
+          <span>📊 Ocupação atual: ${s.ocupacaoAtual.toFixed(0)}% → após inclusão: ${s.ocupacaoNova.toFixed(0)}%</span><br>
+          <span>✅ Espaço disponível: ${s.volumeDisponivel.toFixed(2)} m³ / ${s.pesoDisponivel.toFixed(0)} kg</span><br>
+          <span>📍 Distância adicional: ${s.distanciaExtra.toFixed(1)} km</span><br>
+          <span class="pill ${s.ocupacaoNova > 90 ? 'pill-yellow' : (s.ocupacaoNova > 70 ? 'pill-blue' : 'pill-green')}">
+            ${s.ocupacaoNova > 90 ? '⚠️ Próximo do limite' : (s.ocupacaoNova > 70 ? '📦 Bom aproveitamento' : '✅ Pode consolidar')}
+          </span>
+        </div>
+      `).join('');
+    }
+    setStatus(`Análise concluída: ${sugestoes.length} rotas compatíveis`, "ok");
+  } catch(err) {
+    console.error(err);
+    alert("Erro na análise: " + err.message);
+    setStatus(`Erro: ${err.message}`, "err");
+  }
+}
+
+async function simularLoteCSV() {
+  const fileInput = document.getElementById("batchCsvFile");
+  const file = fileInput.files[0];
+  if(!file) { alert("Selecione um arquivo CSV"); return; }
+  Papa.parse(file, {
+    header: true,
+    skipEmptyLines: true,
+    complete: async (res) => {
+      if(!res.data || !res.data.length) { alert("Arquivo vazio ou inválido"); return; }
+      await processarLoteSimulacao(res.data);
+    },
+    error: (err) => { alert("Erro ao ler CSV: "+err.message); }
+  });
+}
+async function simularLoteAPI() {
+  const url = document.getElementById("batchApiUrl").value;
+  if(!url) { alert("Informe a URL da API"); return; }
+  setStatus("Buscando lote via API...", "warn");
+  try {
+    const response = await fetch(url);
+    if(!response.ok) throw new Error(`HTTP ${response.status}`);
+    const dados = await response.json();
+    if(!Array.isArray(dados)) throw new Error("Resposta não é um array");
+    await processarLoteSimulacao(dados);
+  } catch(err) {
+    alert("Erro ao buscar lote: "+err.message);
+    setStatus(`Erro: ${err.message}`, "err");
+  }
+}
+async function processarLoteSimulacao(linhas) {
+  if(!geocoder) { alert("Mapa não carregado. Aguarde a inicialização."); return; }
+  setStatus("Processando lote de simulação...", "warn");
+  const resultados = [];
+  let ok = 0, erro = 0;
+  for(let i=0; i<linhas.length; i++) {
+    const row = linhas[i];
+    const endereco = row.endereco || row.Endereco || row.ENDERECO || "";
+    const peso = parseFloat(row.peso || row.Peso || row.PESO || 0);
+    let volume = parseFloat(row.volume || row.Volume || row.VOLUME || 0);
+    const cubagem = parseFloat(row.cubagem || row.Cubagem || row.CUBAGEM || 0);
+    const cliente = row.cliente || row.Cliente || row.CLIENTE || "";
+    const destinatario = row.destinatario || row.Destinatario || row.DESTINATARIO || "";
+    if(!endereco) { resultados.push({ linha: i+1, ok: false, motivo: "Endereço ausente" }); erro++; continue; }
+    let volumeCalculado = cubagem>0 ? cubagem : volume;
+    if(volumeCalculado<=0 && peso>0) {
+      const fator = parseFloat(document.getElementById("fatorCubagem")?.value || 0.003);
+      volumeCalculado = Math.max(peso * fator, 0.01);
+    }
+    if(volumeCalculado<=0) { resultados.push({ linha: i+1, ok: false, motivo: "Volume inválido" }); erro++; continue; }
+    try {
+      const coord = await geocodeAddress(endereco);
+      if(!coord) throw new Error("Endereço não geocodificado");
+      const depot = document.getElementById("depot").value;
+      const origemCoord = await geocodeAddress(depot);
+      const distancia = calcularDistancia(origemCoord.lat, origemCoord.lng, coord.lat, coord.lng);
+      const pedidoSimulado = {
+        pesoTotal: peso,
+        volumeTotal: volumeCalculado,
+        numNotas: 1,
+        items: [{ altura: 0.5, largura: 0.5, profundidade: 0.5, dimCritica: 0.5 }],
+        exclusivo: false,
+        cubagemAuto: volume<=0 && cubagem<=0
+      };
+      const veiculoObj = escolherVeiculoParaCarga([pedidoSimulado]);
+      const veiculo = veiculoObj ? veiculoObj.veiculo : null;
+      const ocupacao = veiculo ? (volumeCalculado / veiculo.volumeMax) * 100 : 0;
+      const custo = veiculo ? distancia * veiculo.custoKm : 0;
+      resultados.push({
+        linha: i+1, ok: true, cliente, destinatario, endereco, distancia, peso, volume: volumeCalculado,
+        veiculo: veiculo ? veiculo.nome : "Nenhum", ocupacao, custo
+      });
+      ok++;
+    } catch(e) {
+      resultados.push({ linha: i+1, ok: false, motivo: e.message });
+      erro++;
+    }
+  }
+  renderLoteResultados(resultados);
+  setStatus(`Lote processado: ${ok} sucesso, ${erro} erros`, "ok");
+}
+function renderLoteResultados(resultados) {
+  const div = document.getElementById("batchResultado");
+  if(!div) return;
+  if(!resultados.length) { div.innerHTML = "<div class='inline-alert'>Nenhum resultado</div>"; return; }
+  let html = `<h3>📊 Resultados da Simulação em Lote</h3>
+  <div class="table-wrap"><table class="batch-sim-table">
+    <thead><tr><th>Linha</th><th>Cliente</th><th>Destinatário</th><th>Distância (km)</th><th>Peso (kg)</th><th>Volume (m³)</th><th>Veículo</th><th>Ocupação</th><th>Custo (R$)</th><th>Status</th></tr></thead><tbody>`;
+  for(let r of resultados) {
+    if(r.ok) {
+      html += `<tr>
+        <td>${r.linha}</td><td>${r.cliente||"-"}</td><td>${r.destinatario||"-"}</td>
+        <td>${r.distancia.toFixed(1)}</td><td>${formatNumber(r.peso)}</td><td>${formatNumber(r.volume)}</td>
+        <td>${r.veiculo}</td><td>${r.ocupacao.toFixed(0)}%</td><td>${formatCurrency(r.custo)}</td>
+        <td class="ok">✅ Ok</td>
+      </tr>`;
+    } else {
+      html += `<tr>
+        <td>${r.linha}</td><td colspan="8">❌ Erro: ${r.motivo}</td>
+        <td class="err">Falha</td>
+      </tr>`;
+    }
+  }
+  html += `</tbody></table></div>`;
+  div.innerHTML = html;
+}
+
 function loadGoogleMaps() {
   const mapEl = document.getElementById("map");
   if (!APP_CONFIG.GOOGLE_API_KEY || APP_CONFIG.GOOGLE_API_KEY === "COLE_SUA_CHAVE_AQUI") {
@@ -1584,6 +1513,165 @@ function initCSVImport() {
   }); 
 }
 
+// ==================== CENTRAL DE PEDIDOS (IA de oportunidades) ====================
+function obterPedidosPendentes() {
+  if(!ultimoResultado) return pedidos.filter(p => !operacaoLeve.some(op => op.os === p.os));
+  const alocadosOs = new Set();
+  if(ultimoResultado.rotas) {
+    for(let r of ultimoResultado.rotas) {
+      for(let p of r.pedidos) alocadosOs.add(p.os);
+    }
+  }
+  if(ultimoResultado.holdList) for(let p of ultimoResultado.holdList) alocadosOs.add(p.os);
+  if(ultimoResultado.aguardandoDefinicao) for(let p of ultimoResultado.aguardandoDefinicao) alocadosOs.add(p.os);
+  if(ultimoResultado.aereosAguardando) for(let p of ultimoResultado.aereosAguardando) alocadosOs.add(p.os);
+  const pendentes = pedidos.filter(p => !alocadosOs.has(p.os) && !operacaoLeve.some(op => op.os === p.os));
+  return pendentes;
+}
+function renderCentral() {
+  const pendentes = obterPedidosPendentes();
+  const tbody = document.getElementById("centralTableBody");
+  if(!tbody) return;
+  if(pendentes.length === 0) {
+    tbody.innerHTML = '73q<td colspan="15">Nenhum pedido pendente.3u7';
+    return;
+  }
+  tbody.innerHTML = pendentes.map(p => `
+     <tr>
+       <td>${p.os || '-'}</td>
+       <td>${p.codDepositante || '-'}</td>
+       <td>${p.depositante || '-'}</td>
+       <td>${p.cnpj || '-'}</td>
+       <td>${p.destinatario || '-'}</td>
+       <td>${p.cep || '-'}</td>
+       <td>${p.logradouro || '-'}</td>
+       <td>${p.numero || '-'}</td>
+       <td>${p.bairro || '-'}</td>
+       <td>${p.cidade || '-'}</td>
+       <td>${p.uf || '-'}</td>
+       <td>${formatNumber(p.pesoTotal)} kg</td>
+       <td>${formatNumber(p.volumeTotal)} m³</td>
+       <td>${p.dataPrevisao || '-'}</td>
+       <td>${p.modalidade || '-'}</td>
+     </tr>
+  `).join('');
+}
+function atualizarCentral() { renderCentral(); exibirOportunidades(); }
+
+async function analisarOportunidadesConsolidacao() {
+  if(!ultimoResultado || !ultimoResultado.rotas || ultimoResultado.rotas.length === 0) {
+    document.getElementById("oportunidadesList").innerHTML = '<div class="inline-alert">⚠️ Nenhuma rota planejada. Execute o planejamento primeiro.</div>';
+    return;
+  }
+  setStatus("Analisando oportunidades de consolidação...", "warn");
+  try {
+    const pendentes = obterPedidosPendentes();
+    if(pendentes.length === 0) {
+      document.getElementById("oportunidadesList").innerHTML = '<div class="inline-alert">✅ Nenhum pedido pendente.</div>';
+      setStatus("Nenhum pedido pendente", "ok");
+      return;
+    }
+    const oportunidades = [];
+    const raioKm = parseFloat(document.getElementById("cfgRaioKm").value) || 80;
+    for(let pedido of pendentes) {
+      for(let rota of ultimoResultado.rotas) {
+        const veiculo = rota.veiculo;
+        if(!veiculo) continue;
+        const volumeDisponivel = veiculo.volumeMax - rota.volumeTotal;
+        const pesoDisponivel = veiculo.pesoMax - rota.pesoTotal;
+        const notasDisponivel = veiculo.notasMax - rota.numNotas;
+        if(volumeDisponivel < pedido.volumeTotal || pesoDisponivel < pedido.pesoTotal || notasDisponivel < 1) continue;
+        if(!podeConsolidar(rota.pedidos[0], pedido)) continue;
+        let distanciaOk = true;
+        for(let p of rota.pedidos) {
+          if(calcularDistancia(p.lat, p.lng, pedido.lat, pedido.lng) > raioKm) { distanciaOk = false; break; }
+        }
+        if(!distanciaOk) continue;
+        const ocupacaoAtual = (rota.volumeTotal / veiculo.volumeMax) * 100;
+        const ocupacaoNova = ((rota.volumeTotal + pedido.volumeTotal) / veiculo.volumeMax) * 100;
+        oportunidades.push({
+          pedido: pedido,
+          rota: rota,
+          rotaIndex: ultimoResultado.rotas.findIndex(r => r.id === rota.id) + 1,
+          ocupacaoAtual, ocupacaoNova, volumeDisponivel, pesoDisponivel
+        });
+      }
+    }
+    oportunidadesAtuais = oportunidades;
+    exibirOportunidades();
+    setStatus(`Análise concluída: ${oportunidades.length} oportunidades encontradas.`, "ok");
+  } catch(err) {
+    console.error(err);
+    setStatus(`Erro: ${err.message}`, "err");
+    document.getElementById("oportunidadesList").innerHTML = `<div class="inline-alert err">Erro: ${err.message}</div>`;
+  }
+}
+function exibirOportunidades() {
+  const div = document.getElementById("oportunidadesList");
+  if(!div) return;
+  if(oportunidadesAtuais.length === 0) {
+    div.innerHTML = '<div class="inline-alert">🔍 Nenhuma oportunidade de consolidação no momento.</div>';
+    return;
+  }
+  div.innerHTML = oportunidadesAtuais.map(op => `
+    <div class="oportunidade-card">
+      <strong>📦 Pedido ${op.pedido.os}</strong> - ${op.pedido.destinatario || "-"} (${op.pedido.cidade}/${op.pedido.uf})<br>
+      🚛 Pode ser incluído na <strong>Rota ${op.rotaIndex} - ${op.rota.nomeCorredor}</strong> (${op.rota.veiculo.nome})<br>
+      📊 Ocupação atual: ${op.ocupacaoAtual.toFixed(0)}% → após inclusão: ${op.ocupacaoNova.toFixed(0)}%<br>
+      ✅ Espaço disponível: ${op.volumeDisponivel.toFixed(2)} m³ / ${op.pesoDisponivel.toFixed(0)} kg<br>
+      <div class="row" style="margin-top:8px;">
+        <button class="btn btn-green" onclick="aceitarOportunidade('${op.pedido.os}', '${op.rota.id}')">✅ Aceitar</button>
+        <button class="btn btn-gray" onclick="ignorarOportunidade('${op.pedido.os}', '${op.rota.id}')">❌ Ignorar</button>
+      </div>
+    </div>
+  `).join('');
+}
+function aceitarOportunidade(pedidoOs, rotaId) {
+  const pedido = obterPedidosPendentes().find(p => p.os === pedidoOs);
+  if(!pedido) return;
+  const rota = ultimoResultado.rotas.find(r => r.id === rotaId);
+  if(!rota) return;
+  rota.pedidos.push(pedido);
+  rota.pesoTotal = rota.pedidos.reduce((s,p)=>s+p.pesoTotal,0);
+  rota.volumeTotal = rota.pedidos.reduce((s,p)=>s+p.volumeTotal,0);
+  rota.numNotas = rota.pedidos.reduce((s,p)=>s+p.numNotas,0);
+  const veiculoObj = escolherVeiculoParaCarga(rota.pedidos);
+  if(veiculoObj) {
+    rota.veiculo = veiculoObj.veiculo;
+    const novaDecisao = gerarFatorDecisorio(rota.pedidos, veiculoObj, rota.grupoChave);
+    rota.fatorDecisorio = novaDecisao.motivoDimensao;
+    rota.decisao = novaDecisao;
+    rota.maiorItem = novaDecisao.maiorItem;
+    rota.itemCritico = { item: novaDecisao.maiorItem };
+  } else {
+    alert("Erro: Pedido não cabe na rota após validação final.");
+    return;
+  }
+  atualizarMetricas();
+  renderMapControls();
+  renderResumo();
+  if(map && geocoder) desenharRotas(ultimoResultado.rotas, document.getElementById("depot").value);
+  oportunidadesAtuais = oportunidadesAtuais.filter(op => !(op.pedido.os === pedidoOs && op.rota.id === rotaId));
+  exibirOportunidades();
+  renderCentral();
+  setStatus(`Pedido ${pedido.os} consolidado na rota ${rota.nomeCorredor}.`, "ok");
+}
+function ignorarOportunidade(pedidoOs, rotaId) {
+  oportunidadesAtuais = oportunidadesAtuais.filter(op => !(op.pedido.os === pedidoOs && op.rota.id === rotaId));
+  exibirOportunidades();
+  setStatus(`Oportunidade ignorada.`, "info");
+}
+
+let timerOportunidades = null;
+function iniciarTimerOportunidades() {
+  if(timerOportunidades) clearInterval(timerOportunidades);
+  timerOportunidades = setInterval(() => {
+    if(document.getElementById("central").classList.contains("active")) {
+      analisarOportunidadesConsolidacao();
+    }
+  }, 5 * 60 * 1000);
+}
+
 document.addEventListener("DOMContentLoaded", () => { 
   carregarCorredoresDaUI(); 
   loadLocalCaches(); 
@@ -1595,6 +1683,7 @@ document.addEventListener("DOMContentLoaded", () => {
   loadGoogleMaps(); 
   initCSVImport(); 
   carregarFavoritas();
+  iniciarTimerOportunidades();
   if (vehicles.length === 0) adicionarVeiculoPadrao(); 
 });
 </script>
