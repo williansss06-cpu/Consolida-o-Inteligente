@@ -1530,17 +1530,25 @@ function loadGoogleMaps() {
     if (mapEl) mapEl.innerHTML = "Mapa operacional local. Preencha APP_CONFIG.GOOGLE_API_KEY para Google Maps real.";
     return;
   }
+
+  // Se a API já foi carregada (ex: recarregou a página)
   if (window.google && window.google.maps) {
-    if (mapEl && !window.map) {
-      window.map = new google.maps.Map(mapEl, { center: depotCoords || { lat: -23.55, lng: -46.63 }, zoom: 8 });
-      window.geocoder = new google.maps.Geocoder();
-      map = window.map;
-      geocoder = window.geocoder;
-    }
+    const waitForRoutes = setInterval(() => {
+      if (google.maps.routes && google.maps.routes.TravelMode) {
+        clearInterval(waitForRoutes);
+        if (mapEl && !window.map) {
+          window.map = new google.maps.Map(mapEl, { center: { lat: -23.55, lng: -46.63 }, zoom: 8 });
+          window.geocoder = new google.maps.Geocoder();
+          map = window.map;
+          geocoder = window.geocoder;
+          console.log("Google Maps e Routes API carregados com sucesso");
+        }
+      }
+    }, 100);
     return;
   }
 
-  // Define o callback que será executado quando a API carregar
+  // Primeira carga: define callback e insere script
   window.initMapCallback = function() {
     const mapEl = document.getElementById("map");
     if (!window.google || !window.google.maps) return;
@@ -1551,13 +1559,13 @@ function loadGoogleMaps() {
       if (google.maps.routes && google.maps.routes.TravelMode) {
         clearInterval(waitForRoutes);
         if (mapEl) {
-          window.map = new google.maps.Map(mapEl, { center: depotCoords || { lat: -23.55, lng: -46.63 }, zoom: 8 });
+          window.map = new google.maps.Map(mapEl, { center: { lat: -23.55, lng: -46.63 }, zoom: 8 });
           window.geocoder = new google.maps.Geocoder();
           map = window.map;
           geocoder = window.geocoder;
           console.log("Google Maps e Routes API carregados com sucesso");
         }
-      } else if (attempts > 50) {
+      } else if (attempts > 100) {
         clearInterval(waitForRoutes);
         console.error("Routes API não carregou a tempo.");
         if (mapEl) mapEl.innerHTML = "Erro: Routes API não disponível. Verifique sua chave e as APIs ativadas.";
