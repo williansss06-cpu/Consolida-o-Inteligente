@@ -1524,7 +1524,6 @@ function renderLoteResultados(resultados) {
   html += `</tbody></table></div>`;
   div.innerHTML = html;
 }
-
 function loadGoogleMaps() {
   const mapEl = document.getElementById("map");
   if (!APP_CONFIG.GOOGLE_API_KEY || APP_CONFIG.GOOGLE_API_KEY === "COLE_SUA_CHAVE_AQUI") {
@@ -1540,34 +1539,31 @@ function loadGoogleMaps() {
     }
     return;
   }
- window.initMapCallback = function() {
-  const mapEl = document.getElementById("map");
-  if (!window.google || !window.google.maps) return;
 
-  let attempts = 0;
-  const waitForRoutes = setInterval(() => {
-    attempts++;
-    // Verifica se a Routes API já foi carregada
-    if (google.maps.routes && google.maps.routes.TravelMode) {
-      clearInterval(waitForRoutes);
-      // Agora sim, inicializa o mapa
-      if (mapEl) {
-        window.map = new google.maps.Map(mapEl, { center: { lat: -23.55, lng: -46.63 }, zoom: 8 });
-        window.geocoder = new google.maps.Geocoder();
-        map = window.map;
-        geocoder = window.geocoder;
-        console.log("Google Maps e Routes API carregados com sucesso");
+  // Define o callback que será executado quando a API carregar
+  window.initMapCallback = function() {
+    const mapEl = document.getElementById("map");
+    if (!window.google || !window.google.maps) return;
+
+    let attempts = 0;
+    const waitForRoutes = setInterval(() => {
+      attempts++;
+      if (google.maps.routes && google.maps.routes.TravelMode) {
+        clearInterval(waitForRoutes);
+        if (mapEl) {
+          window.map = new google.maps.Map(mapEl, { center: depotCoords || { lat: -23.55, lng: -46.63 }, zoom: 8 });
+          window.geocoder = new google.maps.Geocoder();
+          map = window.map;
+          geocoder = window.geocoder;
+          console.log("Google Maps e Routes API carregados com sucesso");
+        }
+      } else if (attempts > 50) {
+        clearInterval(waitForRoutes);
+        console.error("Routes API não carregou a tempo.");
+        if (mapEl) mapEl.innerHTML = "Erro: Routes API não disponível. Verifique sua chave e as APIs ativadas.";
       }
-    } else if (attempts > 50) { // timeout após ~5 segundos (100ms * 50)
-      clearInterval(waitForRoutes);
-      console.error("Routes API não carregou a tempo.");
-      if (mapEl) mapEl.innerHTML = "Erro: Routes API não disponível. Verifique sua chave e as APIs ativadas.";
-    }
-  }, 100);
-};
-Com essas alterações, o código aguardará a biblioteca routes ser completamente carregada antes de desenhar as rotas, eliminando o erro "Cannot read properties of undefined (reading 'DRIVE')".
-
-Esta resposta é gerada por AI, apenas para referência.
+    }, 100);
+  };
 
   const script = document.createElement("script");
   script.src = `https://maps.googleapis.com/maps/api/js?key=${APP_CONFIG.GOOGLE_API_KEY}&libraries=places,routes,geometry&callback=initMapCallback`;
@@ -1576,7 +1572,6 @@ Esta resposta é gerada por AI, apenas para referência.
   script.onerror = () => { if (mapEl) mapEl.innerHTML = "Erro ao carregar Google Maps. Verifique a chave e as APIs ativadas."; };
   document.head.appendChild(script);
 }
-
 function initCSVImport() { 
   const input = document.getElementById("ordersCsvFile"); 
   if (!input) return; 
