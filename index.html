@@ -1536,7 +1536,7 @@ function renderLoteResultados(resultados) {
 }
 function loadGoogleMaps() {
   const mapEl = document.getElementById("map");
-  if (!APP_CONFIG.GOOGLE_API_KEY || APP_CONFIG.GOOGLE_API_KEY === "COLE_SUA_CHAVE_AQUI") {
+  if (!APP_CONFIG.GOOGLE_API_KEY || APP_CONFIG.GOOGLE_API_KEY === "AIzaSyAIzaSyCBovqGqMOw9wYYzZQCrZ2Wttv42vEG3ds") {
     if (mapEl) mapEl.innerHTML = "Mapa operacional local. Preencha APP_CONFIG.GOOGLE_API_KEY para Google Maps real.";
     return;
   }
@@ -1868,9 +1868,6 @@ document.addEventListener("DOMContentLoaded", () => {
   iniciarTimerOportunidades();
   if (vehicles.length === 0) adicionarVeiculoPadrao(); 
 });
-</script>
-  <script async
-  src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAIzaSyCBovqGqMOw9wYYzZQCrZ2Wttv42vEG3ds&libraries=routes,geometry&callback=initMap">
 </script>
 </body>
 </html>
