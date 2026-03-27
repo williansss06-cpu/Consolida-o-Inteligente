@@ -317,8 +317,8 @@ function showTab(tabId,btn=null){
 }
 function setStatus(msg,type=""){ let el=document.getElementById("statusPlanejamento"); if(el){ el.className=`status ${type}`; el.innerHTML=msg; } }
 function setStatusBanco(msg,type=""){ let el=document.getElementById("statusBanco"); if(el){ el.className=`status ${type}`; el.innerHTML=msg; } }
-}
-  function initMap() {
+
+function initMap() {
   const defaultCenter = { lat: -23.4543, lng: -46.5333 }; // Guarulhos
 
   map = new google.maps.Map(document.getElementById("map"), {
