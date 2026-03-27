@@ -1526,45 +1526,64 @@ function renderLoteResultados(resultados) {
 }
 function loadGoogleMaps() {
   const mapEl = document.getElementById("map");
-  if (!mapEl) return;
-
-  if (window.google && window.google.maps) {
-    initMapNow();
+  if (!APP_CONFIG.GOOGLE_API_KEY || APP_CONFIG.GOOGLE_API_KEY === "COLE_SUA_CHAVE_AQUI") {
+    if (mapEl) mapEl.innerHTML = "Mapa operacional local. Preencha APP_CONFIG.GOOGLE_API_KEY para Google Maps real.";
     return;
   }
 
-  window.initMapCallback = function() {
-    initMapNow();
-  };
+  // Se o mapa já foi inicializado, não faz nada
+  if (window.map) return;
 
-  const script = document.createElement("script");
-  script.src = `https://maps.googleapis.com/maps/api/js?key=${APP_CONFIG.GOOGLE_API_KEY}&libraries=places,routes,geometry&callback=initMapCallback`;
-  script.async = true;
-  script.defer = true;
-  document.head.appendChild(script);
-
-  function initMapNow() {
-    if (!window.google || !window.google.maps) return;
+  // Função que cria o mapa quando Routes API estiver disponível
+  function initMap() {
+    if (!window.google || !google.maps) return;
     if (window.map) return;
 
     let attempts = 0;
-    const checkRoutes = setInterval(() => {
+    const waitForRoutes = setInterval(() => {
       attempts++;
       if (google.maps.routes && google.maps.routes.TravelMode) {
-        clearInterval(checkRoutes);
+        clearInterval(waitForRoutes);
         window.map = new google.maps.Map(mapEl, { center: { lat: -23.55, lng: -46.63 }, zoom: 8 });
         window.geocoder = new google.maps.Geocoder();
         map = window.map;
         geocoder = window.geocoder;
-        console.log("Mapa e Routes API carregados");
+        console.log("✅ Google Maps e Routes API carregados com sucesso");
         mapEl.innerHTML = "";
-      } else if (attempts > 200) {
-        clearInterval(checkRoutes);
-        console.error("Timeout aguardando Routes");
-        mapEl.innerHTML = "Erro: Routes API não disponível.";
+      } else if (attempts > 200) { // 20 segundos
+        clearInterval(waitForRoutes);
+        console.error("❌ Routes API não carregou a tempo.");
+        mapEl.innerHTML = "Erro: Routes API não disponível. Verifique sua chave e as APIs ativadas.<br><button onclick='location.reload()'>Tentar recarregar</button>";
       }
     }, 100);
   }
+
+  // Se a API já foi carregada (por exemplo, se o script já estiver no DOM)
+  if (window.google && window.google.maps) {
+    initMap();
+    return;
+  }
+
+  // Define o callback global que será chamado quando a API base carregar
+  window.initMapCallback = function() {
+    console.log("API base carregada, aguardando Routes...");
+    initMap();
+  };
+
+  // Remove qualquer script anterior da API
+  const oldScript = document.querySelector('script[src*="maps.googleapis.com/maps/api/js"]');
+  if (oldScript) oldScript.remove();
+
+  // Carrega a API com as bibliotecas necessárias
+  const script = document.createElement("script");
+  script.src = `https://maps.googleapis.com/maps/api/js?key=${APP_CONFIG.GOOGLE_API_KEY}&libraries=places,routes,geometry&callback=initMapCallback`;
+  script.async = true;
+  script.defer = true;
+  script.onerror = () => {
+    console.error("❌ Erro ao carregar script da API.");
+    if (mapEl) mapEl.innerHTML = "Erro ao carregar Google Maps. Verifique a chave e as APIs ativadas.";
+  };
+  document.head.appendChild(script);
 }
 function initCSVImport() { 
   const input = document.getElementById("ordersCsvFile"); 
