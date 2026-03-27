@@ -1603,12 +1603,8 @@ function loadGoogleMaps() {
   };
 
   loadScript();
-}
-
-// Função separada para inicializar o mapa (chamada quando tudo estiver pronto)
-function initMap(mapEl) {
-  // Não é mais necessária porque tryInitMap já faz isso, mas mantida para compatibilidade.
 } 
+function initCSVImport() { 
   const input = document.getElementById("ordersCsvFile"); 
   if (!input) return; 
   input.addEventListener("change", function (e) { 
@@ -1637,7 +1633,6 @@ function initMap(mapEl) {
     }); 
   }); 
 }
-
 // ==================== CENTRAL DE PEDIDOS (IA de oportunidades) ====================
 function obterPedidosPendentes() {
   if(!ultimoResultado) return pedidos.filter(p => !operacaoLeve.some(op => op.os === p.os));
