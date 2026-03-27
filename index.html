@@ -1526,84 +1526,46 @@ function renderLoteResultados(resultados) {
 }
 function loadGoogleMaps() {
   const mapEl = document.getElementById("map");
-  if (!APP_CONFIG.GOOGLE_API_KEY || APP_CONFIG.GOOGLE_API_KEY === "COLE_SUA_CHAVE_AQUI") {
-    if (mapEl) mapEl.innerHTML = "Mapa operacional local. Preencha APP_CONFIG.GOOGLE_API_KEY para Google Maps real.";
+  if (!mapEl) return;
+
+  if (window.google && window.google.maps) {
+    initMapNow();
     return;
   }
 
-  // Se o mapa já foi inicializado, não faz nada
-  if (window.map) return;
+  window.initMapCallback = function() {
+    initMapNow();
+  };
 
-  // Função que tenta inicializar o mapa quando a Routes API estiver disponível
-  function tryInitMap() {
-    if (window.google && google.maps && google.maps.routes && google.maps.routes.TravelMode) {
-      if (!window.map) {
+  const script = document.createElement("script");
+  script.src = `https://maps.googleapis.com/maps/api/js?key=${APP_CONFIG.GOOGLE_API_KEY}&libraries=places,routes,geometry&callback=initMapCallback`;
+  script.async = true;
+  script.defer = true;
+  document.head.appendChild(script);
+
+  function initMapNow() {
+    if (!window.google || !window.google.maps) return;
+    if (window.map) return;
+
+    let attempts = 0;
+    const checkRoutes = setInterval(() => {
+      attempts++;
+      if (google.maps.routes && google.maps.routes.TravelMode) {
+        clearInterval(checkRoutes);
         window.map = new google.maps.Map(mapEl, { center: { lat: -23.55, lng: -46.63 }, zoom: 8 });
         window.geocoder = new google.maps.Geocoder();
         map = window.map;
         geocoder = window.geocoder;
-        console.log("✅ Google Maps e Routes API carregados com sucesso");
-        mapEl.innerHTML = ""; // remove a mensagem de erro se houver
-      }
-      return true;
-    }
-    return false;
-  }
-
-  // Se a API já estiver no DOM (talvez já carregada por outro script)
-  if (window.google && window.google.maps) {
-    if (tryInitMap()) return;
-    // Se a base está carregada mas routes não, aguarda um pouco mais
-    let attempts = 0;
-    const interval = setInterval(() => {
-      attempts++;
-      if (tryInitMap()) {
-        clearInterval(interval);
-      } else if (attempts > 150) { // 15 segundos
-        clearInterval(interval);
-        console.error("❌ Routes API não carregou após a base.");
-        mapEl.innerHTML = "Erro: Routes API não disponível. Verifique sua chave e as APIs ativadas.<br><button onclick='location.reload()'>Tentar recarregar</button>";
+        console.log("Mapa e Routes API carregados");
+        mapEl.innerHTML = "";
+      } else if (attempts > 200) {
+        clearInterval(checkRoutes);
+        console.error("Timeout aguardando Routes");
+        mapEl.innerHTML = "Erro: Routes API não disponível.";
       }
     }, 100);
-    return;
   }
-
-  // Se não há API carregada, carrega o script
-  const loadScript = () => {
-    // Remove script anterior se existir
-    const oldScript = document.querySelector('script[src*="maps.googleapis.com/maps/api/js"]');
-    if (oldScript) oldScript.remove();
-
-    const script = document.createElement("script");
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${APP_CONFIG.GOOGLE_API_KEY}&libraries=places,routes,geometry&callback=onApiLoaded`;
-    script.async = true;
-    script.defer = true;
-    script.onerror = () => {
-      console.error("❌ Erro ao carregar script da API.");
-      if (mapEl) mapEl.innerHTML = "Erro ao carregar Google Maps. Verifique a chave e as APIs ativadas.";
-    };
-    document.head.appendChild(script);
-  };
-
-  // Callback global que será chamado quando a API carregar
-  window.onApiLoaded = function() {
-    console.log("API base carregada, aguardando Routes...");
-    let attempts = 0;
-    const interval = setInterval(() => {
-      attempts++;
-      if (tryInitMap()) {
-        clearInterval(interval);
-      } else if (attempts > 200) { // 20 segundos
-        clearInterval(interval);
-        console.error("❌ Routes API não carregou a tempo.");
-        mapEl.innerHTML = `Erro: Routes API não disponível. Verifique sua chave e as APIs ativadas.
-        <button onclick="location.reload()">Tentar recarregar</button>`;
-      }
-    }, 100);
-  };
-
-  loadScript();
-} 
+}
 function initCSVImport() { 
   const input = document.getElementById("ordersCsvFile"); 
   if (!input) return; 
