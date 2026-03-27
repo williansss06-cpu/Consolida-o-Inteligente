@@ -317,7 +317,17 @@ function showTab(tabId,btn=null){
 }
 function setStatus(msg,type=""){ let el=document.getElementById("statusPlanejamento"); if(el){ el.className=`status ${type}`; el.innerHTML=msg; } }
 function setStatusBanco(msg,type=""){ let el=document.getElementById("statusBanco"); if(el){ el.className=`status ${type}`; el.innerHTML=msg; } }
+}
+  function initMap() {
+  const defaultCenter = { lat: -23.4543, lng: -46.5333 }; // Guarulhos
 
+  map = new google.maps.Map(document.getElementById("map"), {
+    center: defaultCenter,
+    zoom: 8,
+  });
+
+  geocoder = new google.maps.Geocoder();
+}
 // ==================== CORREDORES ====================
 const REGIOES_SP = {
   "VALE_DO_PARAIBA": { nome: "Vale do Paraíba", cidades: ["SAO JOSE DOS CAMPOS","TAUBATE","JACAREI"], integracaoCorredor: "VALE_DO_PARAIBA" },
@@ -1859,5 +1869,8 @@ document.addEventListener("DOMContentLoaded", () => {
   if (vehicles.length === 0) adicionarVeiculoPadrao(); 
 });
 </script>
+  <script async
+  src="https://maps.googleapis.com/maps/api/js?key=SUA_API_KEY&libraries=routes,geometry&callback=initMap">
+</script>
 </body>
-</html>
+
