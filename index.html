@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Frete PRO TMS - Consolidação Profissional com Orçamentos</title>
+  <title>Frete PRO TMS - Consolidação Profissional com API</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
   <style>
     * { box-sizing: border-box; }
@@ -18,7 +18,8 @@
     .grid{display:grid;gap:12px}.grid-2{grid-template-columns:repeat(2,minmax(0,1fr))}.grid-3{grid-template-columns:repeat(3,minmax(0,1fr))}.grid-4{grid-template-columns:repeat(4,minmax(0,1fr))}.grid-5{grid-template-columns:repeat(5,minmax(0,1fr))}.grid-6{grid-template-columns:repeat(6,minmax(0,1fr))}
     .field{display:flex;flex-direction:column;gap:6px}.field label{font-size:14px;font-weight:600;color:#334155}
     input,select,textarea{width:100%;padding:12px;border:1px solid #cbd5e1;border-radius:10px;background:#fff;font-size:14px;outline:none}input:focus,select:focus,textarea:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(37,99,235,.12)}
-    .row{display:flex;gap:12px;flex-wrap:wrap;align-items:end}.btn{border:none;border-radius:10px;padding:12px 18px;font-size:14px;cursor:pointer;transition:.2s;font-weight:600}.btn-blue{background:var(--blue);color:#fff}.btn-blue:hover{background:#1d4ed8}.btn-green{background:var(--green);color:#fff}.btn-green:hover{background:#16a34a}.btn-orange{background:var(--orange);color:#fff}.btn-red{background:var(--red);color:#fff}.btn-purple{background:var(--purple);color:#fff}.btn-gray{background:#475569;color:#fff}
+    .row{display:flex;gap:12px;flex-wrap:wrap;align-items:end}.btn{border:none;border-radius:10px;padding:12px 18px;font-size:14px;cursor:pointer;transition:.2s;font-weight:600}
+    .btn-blue{background:var(--blue);color:#fff}.btn-blue:hover{background:#1d4ed8}.btn-green{background:var(--green);color:#fff}.btn-green:hover{background:#16a34a}.btn-orange{background:var(--orange);color:#fff}.btn-red{background:var(--red);color:#fff}.btn-purple{background:var(--purple);color:#fff}.btn-gray{background:#475569;color:#fff}
     .table-wrap{overflow-x:auto;max-width:100%;margin-top:14px;background:#fff;border-radius:12px;border:1px solid var(--line)}table{width:100%;border-collapse:collapse;min-width:600px;}th,td{padding:10px 12px;border:1px solid var(--line);text-align:left;vertical-align:top;font-size:13px}th{background:#eef2f7;font-weight:700}
     .small{font-size:13px;color:var(--muted)}.status{margin-top:12px;font-weight:700}.ok{color:#15803d}.warn{color:#b45309}.err{color:#b91c1c}.info{color:#1d4ed8}
     .metrics{display:flex;flex-wrap:wrap;gap:14px;justify-content:space-between;margin-bottom:20px}.metric{background:#fff;border-radius:14px;padding:16px;flex:1;min-width:120px;text-align:center;box-shadow:0 2px 8px rgba(15,23,42,.05)}.metric .label{font-size:13px;color:var(--muted);margin-bottom:8px}.metric .value{font-size:24px;font-weight:800;color:var(--text)}
@@ -44,7 +45,6 @@
     .batch-sim-table th { background: #eef2f7; }
     .oportunidade-card { background: #fff3e0; border-left: 4px solid #f59e0b; padding: 12px; margin-bottom: 10px; border-radius: 8px; transition: 0.2s; }
     .oportunidade-card:hover { background: #ffedcc; }
-    /* NOVOS ESTILOS PARA ORÇAMENTOS */
     .budget-card { border-left: 4px solid var(--orange); background: #fff9f0; margin-bottom: 12px; transition: 0.2s; }
     .budget-card:hover { transform: translateX(2px); }
     .budget-status { font-size: 12px; font-weight: bold; margin-top: 5px; padding: 4px 8px; border-radius: 12px; display: inline-block; }
@@ -75,7 +75,7 @@
   </aside>
 
   <main class="content">
-    <!-- PARÂMETROS (frota, configurações, corredores, regras) - MANTIDO ORIGINAL -->
+    <!-- PARÂMETROS (frota, configurações, corredores, regras) -->
     <section id="parametros" class="tab active">
       <div class="card">
         <div class="row" style="justify-content: space-between;">
@@ -137,7 +137,7 @@
       </div>
     </section>
 
-    <!-- PEDIDOS (consolidador) - MANTIDO ORIGINAL -->
+    <!-- PEDIDOS (consolidador) -->
     <section id="pedidos" class="tab">
       <div class="card">
         <h2>Importar CSV</h2>
@@ -162,7 +162,7 @@
       </div>
     </section>
 
-    <!-- CENTRAL DE PEDIDOS - MANTIDO ORIGINAL -->
+    <!-- CENTRAL DE PEDIDOS -->
     <section id="central" class="tab">
       <div class="card">
         <div class="row" style="justify-content: space-between;">
@@ -189,7 +189,7 @@
       </div>
     </section>
 
-    <!-- NOVA ABA: ORÇAMENTOS EM APROVAÇÃO -->
+    <!-- ORÇAMENTOS EM APROVAÇÃO -->
     <section id="orcamentos" class="tab">
       <div class="card">
         <div class="row" style="justify-content: space-between; align-items: center;">
@@ -204,7 +204,7 @@
       </div>
     </section>
 
-    <!-- SIMULADOR - COM NOVO BOTÃO GERAR ORÇAMENTO -->
+    <!-- SIMULADOR -->
     <section id="simulador" class="tab">
       <div class="card">
         <h2>🚛 Simulação de Rota e Valor de Frete</h2>
@@ -254,7 +254,7 @@
       </div>
     </section>
 
-    <!-- API - MANTIDO ORIGINAL -->
+    <!-- API -->
     <section id="api" class="tab">
       <div class="card">
         <h2>🔌 Integração via API</h2>
@@ -267,7 +267,7 @@
       </div>
     </section>
 
-    <!-- PLANEJAMENTO - MANTIDO ORIGINAL -->
+    <!-- PLANEJAMENTO -->
     <section id="planejamento" class="tab">
       <div class="card">
         <h2>Executar Planejamento</h2>
@@ -280,7 +280,7 @@
       </div>
     </section>
 
-    <!-- RESULTADO - MANTIDO ORIGINAL -->
+    <!-- RESULTADO -->
     <section id="resultado" class="tab">
       <div class="metrics">
         <div class="metric"><div class="label">Pedidos</div><div class="value" id="mPedidos">0</div></div>
@@ -297,7 +297,7 @@
       <div class="card">
         <div class="row" style="justify-content: space-between; align-items: center;">
           <h2 style="margin:0;">Resumo Operacional</h2>
-          <button class="btn btn-purple" onclick="enviarParaFreteInteligente(ultimoResultado?.rotas || [])" style="font-size:14px; padding:10px 20px;">
+          <button class="btn btn-purple" onclick="enviarParaFreteInteligente()" style="font-size:14px; padding:10px 20px;">
             🚀 Enviar para Frete Inteligente
           </button>
         </div>
@@ -314,31 +314,36 @@
   </div>
 </div>
 
-<!-- Modal para upload de planilha em lote (NOVO) -->
 <div id="uploadModal" class="modal">
   <div class="modal-content">
     <span class="close" onclick="fecharModal()" style="float:right; font-size:28px; cursor:pointer;">&times;</span>
     <h2>📤 Upload de Planilha para Orçamento em Lote</h2>
     <p class="small">Faça upload de uma planilha CSV com múltiplos destinos para gerar orçamentos em massa.</p>
-    
     <div class="card" style="margin-top:15px;">
       <h3>Formato da Planilha</h3>
       <p class="small">Colunas esperadas: <strong>cliente, destinatario, endereco, peso, volume</strong></p>
       <button class="btn btn-blue" onclick="baixarModeloOrcamentoLote()">📥 Baixar modelo CSV</button>
     </div>
-    
     <div class="card" style="margin-top:15px;">
       <h3>Upload do Arquivo</h3>
       <input type="file" id="batchBudgetFile" accept=".csv" style="width:100%; margin-bottom:15px;" />
       <button class="btn btn-green" onclick="processarOrcamentoLote()" style="width:100%;">🚀 Gerar Orçamentos em Lote</button>
     </div>
-    
     <div id="batchProgress" style="display:none; margin-top:15px;"></div>
   </div>
 </div>
 
 <script>
-// ==================== CONFIGURAÇÃO GLOBAL ====================
+// ==================== CONFIGURAÇÃO GLOBAL COM API ====================
+const API = "https://SEU-BACKEND.laravel.cloud/api"; // 🔴 ALTERAR PARA URL DO BACKEND
+const token = localStorage.getItem("token");
+const empresa_id = localStorage.getItem("empresa_id");
+
+// 🔴 BLOQUEAR ACESSO SEM LOGIN
+if (!token) {
+  window.location.href = "login.html";
+}
+
 const APP_CONFIG = { GOOGLE_API_KEY: "AIzaSyCBovqGqMOw9wYYzZQCrZ2Wttv42vEG3ds" };
 const REGRAS = {
   distancia: { maxKmDireto: 80, maxKmAnalise: 120 },
@@ -360,8 +365,6 @@ let ultimoResultado = null;
 let depotCoords = null;
 let oportunidadesAtuais = [];
 let simulacoesFavoritas = [];
-
-// ==================== NOVAS VARIÁVEIS PARA ORÇAMENTOS ====================
 let orcamentosPendentes = [];
 
 // ==================== FUNÇÕES AUXILIARES ====================
@@ -382,7 +385,76 @@ function showTab(tabId,btn=null){
 function setStatus(msg,type=""){ let el=document.getElementById("statusPlanejamento"); if(el){ el.className=`status ${type}`; el.innerHTML=msg; } }
 function setStatusBanco(msg,type=""){ let el=document.getElementById("statusBanco"); if(el){ el.className=`status ${type}`; el.innerHTML=msg; } }
 
-// ==================== CORREDORES (MANTIDO ORIGINAL) ====================
+// ==================== FUNÇÕES DE API ====================
+async function apiRequest(endpoint, method = 'GET', body = null) {
+  const options = {
+    method,
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer ' + token
+    }
+  };
+  if (body) options.body = JSON.stringify({ ...body, empresa_id });
+  
+  try {
+    const response = await fetch(`${API}${endpoint}`, options);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    return await response.json();
+  } catch (error) {
+    console.error(`Erro na API ${endpoint}:`, error);
+    throw error;
+  }
+}
+
+async function salvarVeiculoNoBackend(veiculo) {
+  try {
+    await apiRequest('/veiculos', 'POST', veiculo);
+    console.log('Veículo salvo no backend:', veiculo.nome);
+  } catch (error) {
+    console.error('Erro ao salvar veículo:', error);
+    // Fallback para localStorage se API falhar
+    salvarNoStorageLocal();
+  }
+}
+
+async function salvarPedidosNoBackend(listaPedidos) {
+  try {
+    await apiRequest('/pedidos/lote', 'POST', { pedidos: listaPedidos });
+    console.log(`${listaPedidos.length} pedidos salvos no backend`);
+  } catch (error) {
+    console.error('Erro ao salvar pedidos:', error);
+  }
+}
+
+async function carregarVeiculosDoBackend() {
+  try {
+    const data = await apiRequest('/veiculos', 'GET');
+    if (data && Array.isArray(data)) {
+      vehicles = data;
+      renderVehicles();
+      salvarNoStorageLocal(); // backup local
+    }
+  } catch (error) {
+    console.error('Erro ao carregar veículos do backend, usando localStorage:', error);
+    carregarDoStorageLocal();
+  }
+}
+
+async function carregarPedidosDoBackend() {
+  try {
+    const data = await apiRequest('/pedidos', 'GET');
+    if (data && Array.isArray(data)) {
+      pedidos = data;
+      renderPedidosSeparados();
+      renderCentral();
+      atualizarMetricas();
+    }
+  } catch (error) {
+    console.error('Erro ao carregar pedidos do backend:', error);
+  }
+}
+
+// ==================== CORREDORES ====================
 const REGIOES_SP = {
   "VALE_DO_PARAIBA": { nome: "Vale do Paraíba", cidades: ["SAO JOSE DOS CAMPOS","TAUBATE","JACAREI"], integracaoCorredor: "VALE_DO_PARAIBA" },
   "CAMPINAS": { nome: "Região Campinas", cidades: ["CAMPINAS","JUNDIAI","SUMARE"], integracaoCorredor: "MINAS_GERAIS" },
@@ -420,7 +492,7 @@ function isCapitalOuGrandeSP(cep) { let cepNum=(cep||"").replace(/\D/g,""); if(!
 function definirRegiaoSP(cidade) { let c=normalizarTexto(cidade).toUpperCase(); for(let [k,r] of Object.entries(REGIOES_SP)) if(r.cidades.includes(c)) return k; return null; }
 function getCorredorInfo(k) { return CORREDORES[k]||{nome:"Outros",rodovia:"-",cidades:[]}; }
 
-// ==================== VEÍCULOS (MANTIDO ORIGINAL) ====================
+// ==================== VEÍCULOS (COM API) ====================
 function definirTipoVeiculoPorVolume(m3) { return REGRAS.cubagem.find(r => m3 <= r.max)?.tipo || "CARRETA"; }
 function tipoDoVeiculo(nome) { const n = normalizarTexto(nome).toLowerCase(); if (n.includes("fiorino")) return "FIORINO"; if (n.includes("van")) return "VAN"; if (n.includes("vuc")) return "VUC"; if (n.includes("toco")) return "TOCO"; if (n.includes("truck")) return "TRUCK"; if (n.includes("carreta")) return "CARRETA"; return "OUTRO"; }
 function cabeNoVeiculoPorDimensao(item, veiculo) { return (item.altura||0) <= (veiculo.alturaMax||0) && (item.largura||0) <= (veiculo.larguraMax||0) && (item.profundidade||0) <= (veiculo.profundidadeMax||0); }
@@ -480,31 +552,53 @@ function motivoNaoAlocadoCarga(lote) {
 function calcularCubagemInteligente(pesoKg, volumeInformado) { let volume = parseNumero(volumeInformado); if (volume > 0) return volume; const regraAuto = document.getElementById("regraCubagemAuto")?.checked !== false; if (!regraAuto) return 0; const fator = parseFloat(document.getElementById("fatorCubagem")?.value || 0.003); return Math.max(pesoKg * fator, 0.01); }
 function custoPorKmPadrao(nome) { let n=normalizarTexto(nome).toLowerCase(); if(n.includes("fiorino")) return 1.8; if(n.includes("van")) return 2.2; if(n.includes("vuc")) return 3.2; if(n.includes("truck")) return 4.8; return 2.5; }
 
-function adicionarVeiculoPadrao() {
+async function adicionarVeiculoPadrao() {
   const defaults = [
     { nome:"Fiorino / Van Leve", volumeMax:5, pesoMax:800, notasMax:30, alturaMax:1.5, larguraMax:1.6, profundidadeMax:2.5, custoKm:2.2 },
     { nome:"VUC", volumeMax:14, pesoMax:3000, notasMax:50, alturaMax:2.2, larguraMax:2.2, profundidadeMax:4.5, custoKm:3.4 },
     { nome:"Truck", volumeMax:30, pesoMax:8000, notasMax:80, alturaMax:2.7, larguraMax:2.4, profundidadeMax:7.5, custoKm:4.8 }
   ];
   let added = 0;
-  defaults.forEach(v => { if (!vehicles.some(x => x.nome === v.nome)) { vehicles.push({ id: crypto.randomUUID?.() || Date.now()+"_"+Math.random(), ...v }); added++; } });
+  for (const v of defaults) {
+    if (!vehicles.some(x => x.nome === v.nome)) {
+      const novoVeiculo = { id: crypto.randomUUID?.() || Date.now()+"_"+Math.random(), ...v };
+      vehicles.push(novoVeiculo);
+      await salvarVeiculoNoBackend(novoVeiculo);
+      added++;
+    }
+  }
   salvarNoStorageLocal(); renderVehicles(); atualizarMetricas(); setStatusBanco(added ? "Frota padrão adicionada!" : "Frota padrão já existe.", added ? "ok" : "info");
 }
-function addVehicle() {
+
+async function addVehicle() {
   let nome=document.getElementById("v_nome").value.trim(), vol=parseFloat(document.getElementById("v_volume").value||0), peso=parseFloat(document.getElementById("v_peso").value||0), notas=parseInt(document.getElementById("v_notas").value||0,10), alt=parseFloat(document.getElementById("v_altura").value||0), larg=parseFloat(document.getElementById("v_largura").value||0), prof=parseFloat(document.getElementById("v_profundidade").value||0), custo=parseFloat(document.getElementById("v_custo_km").value||0);
   if(!nome||vol<=0||peso<=0||notas<=0){ alert("Preencha nome, volume, peso e notas"); return; }
-  vehicles.push({id:crypto.randomUUID?.()||Date.now()+"_"+Math.random(),nome,volumeMax:vol,pesoMax:peso,notasMax:notas,alturaMax:alt||1,larguraMax:larg||1,profundidadeMax:prof||1,custoKm:custo>0?custo:custoPorKmPadrao(nome)});
-  ["v_nome","v_volume","v_peso","v_notas","v_altura","v_largura","v_profundidade","v_custo_km"].forEach(id=>document.getElementById(id).value=""); salvarNoStorageLocal(); renderVehicles(); atualizarMetricas();
+  const novoVeiculo = {id:crypto.randomUUID?.()||Date.now()+"_"+Math.random(),nome,volumeMax:vol,pesoMax:peso,notasMax:notas,alturaMax:alt||1,larguraMax:larg||1,profundidadeMax:prof||1,custoKm:custo>0?custo:custoPorKmPadrao(nome)};
+  vehicles.push(novoVeiculo);
+  await salvarVeiculoNoBackend(novoVeiculo);
+  ["v_nome","v_volume","v_peso","v_notas","v_altura","v_largura","v_profundidade","v_custo_km"].forEach(id=>document.getElementById(id).value=""); 
+  salvarNoStorageLocal(); renderVehicles(); atualizarMetricas();
 }
-function removeVehicle(id){ vehicles=vehicles.filter(v=>String(v.id)!==String(id)); salvarNoStorageLocal(); renderVehicles(); atualizarMetricas(); }
+
+async function removeVehicle(id){ 
+  const veiculo = vehicles.find(v => String(v.id) === String(id));
+  vehicles=vehicles.filter(v=>String(v.id)!==String(id));
+  try {
+    await apiRequest(`/veiculos/${id}`, 'DELETE');
+  } catch(e) { console.error('Erro ao remover veículo do backend:', e); }
+  salvarNoStorageLocal(); renderVehicles(); atualizarMetricas(); 
+}
+
 function renderVehicles(){ let tbody=document.getElementById("vehicleTableBody"); if(!vehicles.length){ tbody.innerHTML='<tr><td colspan="7">Nenhum veículo. Clique em "Adicionar Veículo Leve Padrão</td></tr>'; return; } tbody.innerHTML=vehicles.map(v=>`<tr><td>${v.nome}</td><td>${formatNumber(v.volumeMax)}</td><td>${formatNumber(v.pesoMax)} kg</td><td>${v.notasMax}</td><td>${formatNumber(v.alturaMax)} x ${formatNumber(v.larguraMax)} x ${formatNumber(v.profundidadeMax)} m</td><td>${formatCurrency(v.custoKm)}</td><td><button class="btn btn-red" onclick="removeVehicle('${String(v.id).replace(/'/g,"\\'")}')">X</button></td></tr>`).join(""); }
 function salvarNoStorageLocal() { localStorage.setItem("veiculos", JSON.stringify(vehicles)); }
 function carregarDoStorageLocal() { try { const saved = JSON.parse(localStorage.getItem("veiculos") || "[]"); if (Array.isArray(saved)) vehicles = saved; } catch (e) { vehicles = []; } }
 
+// ==================== PEDIDOS ====================
 function valorColuna(row,names){ for(let key of Object.keys(row||{})){ let cleanKey=normalizarTexto(key).toUpperCase().replace(/\./g,"").replace(/\s+/g," "); for(let name of names){ let cleanName=normalizarTexto(name).toUpperCase().replace(/\./g,"").replace(/\s+/g," "); if(cleanKey===cleanName) return row[key]; } } return ""; }
 function analisarObs(obs){ let t = normalizarTexto(obs).toLowerCase(); return { exclusivo: t.includes("exclusivo") || t.includes("carro exclusivo"), paletizado: t.includes("palet") || t.includes("pallet"), agendamento: t.includes("agend") || t.includes("horario") || t.includes("programada") || t.includes("hora marcada") }; }
 function getMaiorItemDoPedido(pedido){ let maior = null; (pedido.items||[]).forEach(item => { const dimCritica = Math.max(item.altura||0, item.largura||0, item.profundidade||0); if (!maior || dimCritica > maior.dimCritica) maior = { ...item, dimCritica }; }); return maior || { altura:0, largura:0, profundidade:0, dimCritica:0 }; }
 function getMaiorItemDaCarga(pedidosDaCarga) { let maior = null; pedidosDaCarga.forEach(p => { const item = getMaiorItemDoPedido(p); if (!maior || (item.dimCritica||0) > (maior.dimCritica||0)) maior = item; }); return maior || { altura:0, largura:0, profundidade:0, dimCritica:0 }; }
+function montarEndereco(p){ return [p.logradouro,p.numero,p.bairro,p.cidade,p.uf,p.cep].filter(Boolean).join(", "); }
 
 function agruparPedidosPorOS(linhas){
   carregarCorredoresDaUI(); let mapa=new Map();
@@ -564,9 +658,7 @@ function gerarFatorDecisorio(pedidosDaCarga, veiculoObj, grupoChave) {
   };
 }
 
-function montarEndereco(p){ return [p.logradouro,p.numero,p.bairro,p.cidade,p.uf,p.cep].filter(Boolean).join(", "); }
-
-// ==================== GEOCÓDIGO E MAPA (MANTIDO ORIGINAL) ====================
+// ==================== GEOCÓDIGO E MAPA ====================
 async function geocodeAddress(addr) { if (!geocoder) throw new Error("Geocodificador não disponível"); if (!addr) throw new Error("Endereço inválido"); const key = addr.trim().toLowerCase(); if (geocodeCache[key]) return geocodeCache[key]; return new Promise((resolve, reject) => { geocoder.geocode({ address: addr }, (results, status) => { if (status === "OK" && results[0]) { const loc = results[0].geometry.location, coords = { lat: loc.lat(), lng: loc.lng() }; geocodeCache[key] = coords; salvarCacheGeo(); resolve(coords); } else reject(new Error(`Falha ao geocodificar: ${addr}`)); }); }); }
 function clearRoutes() { if (routePolylines.length) { routePolylines.forEach(item => item.polyline.setMap(null)); routePolylines = []; } }
 function salvarCacheGeo() { localStorage.setItem("geo_cache", JSON.stringify(geocodeCache)); }
@@ -612,7 +704,7 @@ function desenharRotas(rotas, origem) {
   });
 }
 
-// ==================== ROTEIRIZAÇÃO INTELIGENTE (MANTIDO ORIGINAL) ====================
+// ==================== ROTEIRIZAÇÃO INTELIGENTE ====================
 function definirTipoRota(distKm) { return distKm > 200 ? "TRANSFERENCIA" : "ENTREGA"; }
 function calcularDiasViagem(distKm) { const kmDia = 600; return Math.ceil(distKm / kmDia); }
 function estimarTempoHoras(distKm, tipoVeiculo) { let velocidade = 60; if (tipoVeiculo === "FIORINO") velocidade = 50; if (tipoVeiculo === "VAN") velocidade = 55; if (tipoVeiculo === "VUC") velocidade = 60; if (tipoVeiculo === "TRUCK") velocidade = 65; return distKm / velocidade; }
@@ -674,9 +766,9 @@ function renderPedidosSeparados() {
   const naoExclusivosRod = rodoviarios.filter(p => !p.exclusivo);
   const leves = naoExclusivosRod.filter(p => p.pesoTotal <= 1000);
   const pesados = naoExclusivosRod.filter(p => p.pesoTotal > 1000);
-  lightTable.innerHTML = leves.map(p => `     <input type="checkbox" class="lightCheckbox" value="${p.os}">      <td>${p.os}</td>     <td>${p.destinatario?.substring(0,25)||"-"}</td>     <td>${p.cidade}/${p.uf}</td>     <td>${formatNumber(p.pesoTotal)} kg</td>     <td>${formatNumber(p.volumeTotal)} m³</td>     <td>${formatNumber(p.maiorItem?.dimCritica||0)} m</td>   `).join("");
-  heavyTable.innerHTML = pesados.map(p => `      <td>${p.os}</td>     <td>${p.destinatario?.substring(0,25)||"-"}</td>     <td>${p.cidade}/${p.uf}</td>     <td>${formatNumber(p.pesoTotal)} kg</td>     <td>${formatNumber(p.volumeTotal)} m³</td>     <td>${formatNumber(p.maiorItem?.dimCritica||0)} m</td>   `).join("");
-  exclusivosTable.innerHTML = exclusivos.map(p => `      <td>${p.os}</td>     <td>${p.destinatario?.substring(0,25)||"-"}</td>     <td>${p.cidade}/${p.uf}</td>     <td>${formatNumber(p.pesoTotal)} kg</td>     <td>${formatNumber(p.volumeTotal)} m³</td>     <td>${formatNumber(p.maiorItem?.dimCritica||0)} m</td>   `).join("");
+  lightTable.innerHTML = leves.map(p => `     <input type="checkbox" class="lightCheckbox" value="${p.os}">      <td>${p.os}${p.destinatario?.substring(0,25)||"-"}${p.cidade}/${p.uf}${formatNumber(p.pesoTotal)} kg${formatNumber(p.volumeTotal)} m³${formatNumber(p.maiorItem?.dimCritica||0)} m`).join("");
+  heavyTable.innerHTML = pesados.map(p => `       <td>${p.os}</td><td>${p.destinatario?.substring(0,25)||"-"}</td><td>${p.cidade}/${p.uf}</td><td>${formatNumber(p.pesoTotal)} kg</td><td>${formatNumber(p.volumeTotal)} m³</td><td>${formatNumber(p.maiorItem?.dimCritica||0)} m</td>`).join("");
+  exclusivosTable.innerHTML = exclusivos.map(p => `       <td>${p.os}</td><td>${p.destinatario?.substring(0,25)||"-"}</td><td>${p.cidade}/${p.uf}</td><td>${formatNumber(p.pesoTotal)} kg</td><td>${formatNumber(p.volumeTotal)} m³</td><td>${formatNumber(p.maiorItem?.dimCritica||0)} m</td>`).join("");
   setTextSafe("mPedidos", pedidos.length);
 }
 
@@ -1018,7 +1110,7 @@ function baixarModeloPedidos(){
   let a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="pedidos_modelo.csv"; a.click(); URL.revokeObjectURL(a.href); 
 }
 
-// ==================== API (MANTIDO ORIGINAL) ====================
+// ==================== API ====================
 function exportarDB(tipo) {
   let dados = [];
   if(tipo === 'pedidos') dados = pedidos;
@@ -1050,10 +1142,11 @@ async function carregarPedidosViaAPI() {
     const dados = await response.json();
     if(!Array.isArray(dados)) throw new Error("Resposta não é um array");
     pedidos = agruparPedidosPorOS(dados);
+    await salvarPedidosNoBackend(pedidos);
     renderPedidosSeparados();
     renderOperacaoLeveList();
     atualizarMetricas();
-    alert(`${pedidos.length} pedidos carregados via API.`);
+    alert(`${pedidos.length} pedidos carregados via API e salvos no backend.`);
     setStatus("Pedidos carregados via API", "ok");
   } catch(err) {
     console.error(err);
@@ -1070,7 +1163,7 @@ function testarImagemProduto() {
   div.innerHTML = `<a href="${imgUrl}" target="_blank">🔗 Testar link: ${imgUrl}</a>`;
 }
 
-// ==================== SIMULADOR (COM NOVA FUNÇÃO GERAR ORÇAMENTO) ====================
+// ==================== SIMULADOR ====================
 async function simularFrete() {
   const cliente = document.getElementById("simCliente").value;
   const destinatario = document.getElementById("simDestinatario").value;
@@ -1106,7 +1199,7 @@ async function simularFrete() {
   } catch(err) { console.error(err); alert("Erro na simulação: " + err.message); setStatus(`Erro: ${err.message}`, "err"); }
 }
 
-// ==================== NOVAS FUNÇÕES DE ORÇAMENTO ====================
+// ==================== ORÇAMENTOS ====================
 function carregarOrcamentos() { try { orcamentosPendentes = JSON.parse(localStorage.getItem("fretepro_orcamentos") || "[]"); } catch(e) { orcamentosPendentes = []; } }
 function salvarOrcamentos() { localStorage.setItem("fretepro_orcamentos", JSON.stringify(orcamentosPendentes)); }
 
@@ -1156,6 +1249,7 @@ function aprovarOrcamento(idx) {
     pesoTotal: orc.peso, volumeTotal: orc.volume, numNotas: 1, modalidade: "Rodoviario", items: []
   };
   pedidos.push(novoPedido);
+  salvarPedidosNoBackend([novoPedido]);
   salvarOrcamentos();
   renderOrcamentos();
   renderCentral();
@@ -1172,11 +1266,14 @@ function aprovacaoEmLote() {
   const pendentes = orcamentosPendentes.filter(o => o.status === "pendente");
   if(pendentes.length === 0) { alert("Nenhum orçamento pendente"); return; }
   if(confirm(`Aprovar todos os ${pendentes.length} orçamentos pendentes?`)) {
+    const novosPedidos = [];
     pendentes.forEach(orc => {
       orc.status = "aprovado";
       const novoPedido = { os: "PED-" + Date.now() + "-" + Math.random(), destinatario: orc.destinatario || orc.cliente, cidade: orc.endereco?.split(",")[2]?.trim() || "Não informado", uf: "SP", pesoTotal: orc.peso, volumeTotal: orc.volume, numNotas: 1, modalidade: "Rodoviario", items: [] };
       pedidos.push(novoPedido);
+      novosPedidos.push(novoPedido);
     });
+    salvarPedidosNoBackend(novosPedidos);
     salvarOrcamentos();
     renderOrcamentos();
     renderCentral();
@@ -1198,6 +1295,7 @@ async function processarOrcamentoLote() {
     if(!linhas.length) { alert("Arquivo vazio"); return; }
     const itemsDiv = document.getElementById("batchItems");
     let sucessos = 0, erros = 0;
+    const novosOrcamentos = [];
     for(let i=0; i<linhas.length; i++) {
       const row = linhas[i];
       const cliente = row.cliente || row.Cliente || row.CLIENTE || `Cliente ${i+1}`;
@@ -1219,6 +1317,7 @@ async function processarOrcamentoLote() {
         const custo = veiculo ? distancia * veiculo.custoKm : 0;
         const novoOrcamento = { id: "LOTE-" + Date.now() + "-" + i, cliente, destinatario, endereco, peso, volume, distancia, veiculo: veiculo?.nome || "Nenhum", custo, status: "pendente", data: new Date().toLocaleString() };
         orcamentosPendentes.push(novoOrcamento);
+        novosOrcamentos.push(novoOrcamento);
         sucessos++;
         itemsDiv.innerHTML = itemsDiv.innerHTML.replace(`🔄 Linha ${i+1}: Processando ${destinatario}...`, `✅ Linha ${i+1}: Orçamento gerado - ${formatCurrency(custo)}`);
       } catch(err) { itemsDiv.innerHTML = itemsDiv.innerHTML.replace(`🔄 Linha ${i+1}: Processando ${destinatario}...`, `❌ Linha ${i+1}: Erro - ${err.message}`); erros++; }
@@ -1234,7 +1333,7 @@ function abrirModalUploadPlanilha() { document.getElementById("uploadModal").sty
 function fecharModal() { document.getElementById("uploadModal").style.display = "none"; document.getElementById("batchBudgetFile").value = ""; document.getElementById("batchProgress").style.display = "none"; }
 function baixarModeloOrcamentoLote() { let csv = `cliente,destinatario,endereco,peso,volume\nEMPRESA A,JOÃO SILVA,Rua Augusta 100, São Paulo, SP, 01305-000,450,3.2\nEMPRESA B,MARIA SANTOS,Av Paulista 500, São Paulo, SP, 01310-000,85,1.5`; let blob=new Blob([csv],{type:"text/csv"}); let a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="orcamento_lote_modelo.csv"; a.click(); }
 
-// ==================== SIMULADOR LOTE E FAVORITAS (MANTIDOS ORIGINAIS) ====================
+// ==================== SIMULADOR LOTE E FAVORITAS ====================
 async function analisarInclusaoEmRotas() {
   if(!ultimoResultado || !ultimoResultado.rotas || ultimoResultado.rotas.length === 0) { alert("Não há rotas planejadas. Execute o planejamento primeiro na aba 'Planejamento'."); return; }
   const endereco = document.getElementById("simEndereco").value;
@@ -1351,7 +1450,7 @@ function carregarFavorita(idx) { const fav = simulacoesFavoritas[idx]; if(!fav) 
 function limparFavoritas() { if(confirm("Limpar todas as simulações favoritas?")) { simulacoesFavoritas = []; salvarFavoritasStorage(); renderFavoritas(); } }
 function limparSimulador() { document.getElementById("simCliente").value = ""; document.getElementById("simDestinatario").value = ""; document.getElementById("simEndereco").value = ""; document.getElementById("simPeso").value = ""; document.getElementById("simVolume").value = ""; document.getElementById("simCubagem").value = ""; document.getElementById("simulacaoResultado").style.display = "none"; document.getElementById("sugestoesInclusao").innerHTML = ""; window.ultimaSimulacao = null; }
 
-// ==================== CENTRAL DE PEDIDOS (IA DE OPORTUNIDADES) - MANTIDO ORIGINAL ====================
+// ==================== CENTRAL DE PEDIDOS (IA DE OPORTUNIDADES) ====================
 function obterPedidosPendentes() {
   if(!ultimoResultado) return pedidos.filter(p => !operacaoLeve.some(op => op.os === p.os));
   const alocadosOs = new Set();
@@ -1367,7 +1466,25 @@ function renderCentral() {
   const tbody = document.getElementById("centralTableBody");
   if(!tbody) return;
   if(pendentes.length === 0) { tbody.innerHTML = '<tr><td colspan="15">Nenhum pedido pendente.</td></tr>'; return; }
-  tbody.innerHTML = pendentes.map(p => `<tr><td>${p.os || '-'}</td><td>${p.codDepositante || '-'}</td><td>${p.depositante || '-'}</td><td>${p.cnpj || '-'}</td><td>${p.destinatario || '-'}</td><td>${p.cep || '-'}</td><td>${p.logradouro || '-'}</td><td>${p.numero || '-'}</td><td>${p.bairro || '-'}</td><td>${p.cidade || '-'}</td><td>${p.uf || '-'}</td><td>${formatNumber(p.pesoTotal)} kg</td><td>${formatNumber(p.volumeTotal)} m³</td><td>${p.dataPrevisao || '-'}</td><td>${p.modalidade || '-'}</td></tr>`).join('');
+  tbody.innerHTML = pendentes.map(p => `
+    <tr>
+      <td>${p.os || '-'}</td>
+      <td>${p.codDepositante || '-'}</td>
+      <td>${p.depositante || '-'}</td>
+      <td>${p.cnpj || '-'}</td>
+      <td>${p.destinatario || '-'}</td>
+      <td>${p.cep || '-'}</td>
+      <td>${p.logradouro || '-'}</td>
+      <td>${p.numero || '-'}</td>
+      <td>${p.bairro || '-'}</td>
+      <td>${p.cidade || '-'}</td>
+      <td>${p.uf || '-'}</td>
+      <td>${formatNumber(p.pesoTotal)} kg</td>
+      <td>${formatNumber(p.volumeTotal)} m³</td>
+      <td>${p.dataPrevisao || '-'}</td>
+      <td>${p.modalidade || '-'}</td>
+    </tr>
+  `).join('');
 }
 function atualizarCentral() { renderCentral(); exibirOportunidades(); }
 
@@ -1439,16 +1556,52 @@ function ignorarOportunidade(pedidoOs, rotaId) { oportunidadesAtuais = oportunid
 let timerOportunidades = null;
 function iniciarTimerOportunidades() { if(timerOportunidades) clearInterval(timerOportunidades); timerOportunidades = setInterval(() => { if(document.getElementById("central").classList.contains("active")) { analisarOportunidadesConsolidacao(); } }, 5 * 60 * 1000); }
 
-// ==================== FRETE INTELIGENTE (MANTIDO ORIGINAL) ====================
-function enviarParaFreteInteligente(rotasConsolidadas) {
-  if (!rotasConsolidadas || rotasConsolidadas.length === 0) { alert("⚠️ Nenhuma rota para enviar. Execute o planejamento primeiro."); return; }
-  const rotasFormatadas = rotasConsolidadas.map((rota, index) => ({ id: "rota_" + Date.now() + "_" + index, origem: document.getElementById("depot").value || "Guarulhos/SP", destino: rota.pedidos && rota.pedidos.length > 0 ? montarEndereco(rota.pedidos[rota.pedidos.length - 1]) : "Não especificado", km_total: rota.distanciaKm || 0, tempo_total: rota.tempo || 0, veiculo: rota.veiculo?.nome || "Não definido", tipo_veiculo: rota.veiculo ? tipoDoVeiculo(rota.veiculo.nome) : "INDEFINIDO", ocupacao: rota.volumeTotal && rota.veiculo?.volumeMax ? (rota.volumeTotal / rota.veiculo.volumeMax) * 100 : 100, tipo_rota: rota.distanciaKm > 200 ? "transferencia" : "entrega", paradas: rota.pedidos?.length || 1, peso_total: rota.pesoTotal || 0, volume_total: rota.volumeTotal || 0, empresa_id: localStorage.getItem("empresa_id") || "empresa_padrao", data_execucao: new Date().toISOString(), corredor: rota.nomeCorredor || rota.corredor || "Não definido", rodovia: rota.rodovia || "-", data_entrega: rota.dataEntrega || "Sem data", fator_decisorio: rota.fatorDecisorio || "", custo_estimado: rota.custoEstimado || 0, pedidos_os: rota.pedidos?.map(p => p.os).join(", ") || "", notas_total: rota.numNotas || rota.pedidos?.length || 0 }));
-  localStorage.setItem("rotasFrete", JSON.stringify(rotasFormatadas));
-  localStorage.setItem("rotasFrete_exportado_em", new Date().toISOString());
-  localStorage.setItem("rotasFrete_quantidade", rotasFormatadas.length);
-  alert(`✅ ${rotasFormatadas.length} rotas exportadas com sucesso!\n\n📦 Dados salvos no localStorage.\n🔗 Redirecionando para Frete Inteligente...`);
-  console.log("Rotas exportadas:", rotasFormatadas);
-  window.location.href = "/frete-inteligente.html";
+// ==================== FRETE INTELIGENTE (COM API) ====================
+async function enviarParaFreteInteligente() {
+  if (!ultimoResultado || !ultimoResultado.rotas || ultimoResultado.rotas.length === 0) {
+    alert("⚠️ Nenhuma rota para enviar. Execute o planejamento primeiro.");
+    return;
+  }
+
+  const rotasFormatadas = ultimoResultado.rotas.map((rota, index) => ({
+    id: "rota_" + Date.now() + "_" + index,
+    origem: document.getElementById("depot").value || "Guarulhos/SP",
+    destino: rota.pedidos && rota.pedidos.length > 0 ? montarEndereco(rota.pedidos[rota.pedidos.length - 1]) : "Não especificado",
+    km_total: rota.distanciaKm || 0,
+    tempo_total: rota.tempo || 0,
+    veiculo: rota.veiculo?.nome || "Não definido",
+    tipo_veiculo: rota.veiculo ? tipoDoVeiculo(rota.veiculo.nome) : "INDEFINIDO",
+    ocupacao: rota.volumeTotal && rota.veiculo?.volumeMax ? (rota.volumeTotal / rota.veiculo.volumeMax) * 100 : 100,
+    tipo_rota: rota.distanciaKm > 200 ? "transferencia" : "entrega",
+    paradas: rota.pedidos?.length || 1,
+    peso_total: rota.pesoTotal || 0,
+    volume_total: rota.volumeTotal || 0,
+    empresa_id: empresa_id,
+    data_execucao: new Date().toISOString(),
+    corredor: rota.nomeCorredor || rota.corredor || "Não definido",
+    rodovia: rota.rodovia || "-",
+    data_entrega: rota.dataEntrega || "Sem data",
+    fator_decisorio: rota.fatorDecisorio || "",
+    custo_estimado: rota.custoEstimado || 0,
+    pedidos_os: rota.pedidos?.map(p => p.os).join(", ") || "",
+    notas_total: rota.numNotas || rota.pedidos?.length || 0
+  }));
+
+  try {
+    setStatus("Enviando rotas para o backend...", "warn");
+    await apiRequest('/rotas', 'POST', { rotas: rotasFormatadas });
+    setStatus("Rotas enviadas com sucesso!", "ok");
+    alert(`✅ ${rotasFormatadas.length} rotas enviadas para o sistema!\n\n🔗 Redirecionando para Frete Inteligente...`);
+    window.location.href = "frete.html";
+  } catch (error) {
+    console.error("Erro ao enviar rotas:", error);
+    alert("❌ Erro ao enviar rotas. Verifique sua conexão com o backend.\n\nOs dados foram salvos localmente como backup.");
+    // Fallback: salvar localmente
+    localStorage.setItem("rotasFrete", JSON.stringify(rotasFormatadas));
+    localStorage.setItem("rotasFrete_exportado_em", new Date().toISOString());
+    localStorage.setItem("rotasFrete_quantidade", rotasFormatadas.length);
+    window.location.href = "frete.html";
+  }
 }
 
 // ==================== MAPA E INICIALIZAÇÃO ====================
@@ -1460,13 +1613,45 @@ function loadGoogleMaps() {
   window.initMapCallback = function() { initMap(); };
   const script = document.createElement("script"); script.src = `https://maps.googleapis.com/maps/api/js?key=${APP_CONFIG.GOOGLE_API_KEY}&libraries=places,routes,geometry&callback=initMapCallback`; script.async = true; script.defer = true; script.onerror = () => { console.error("❌ Erro ao carregar script da API."); if (mapEl) mapEl.innerHTML = "Erro ao carregar Google Maps. Verifique a chave e as APIs ativadas."; }; document.head.appendChild(script);
 }
-function initCSVImport() { const input = document.getElementById("ordersCsvFile"); if (!input) return; input.addEventListener("change", function (e) { const file = e.target.files[0]; if (!file) return; Papa.parse(file, { header: true, skipEmptyLines: true, complete: (res) => { try { pedidos = agruparPedidosPorOS(res.data || []); renderPedidosSeparados(); renderOperacaoLeveList(); atualizarMetricas(); alert(`${pedidos.length} pedidos importados`); } catch (err) { console.error(err); alert("Erro ao processar os pedidos."); } e.target.value = ""; }, error: (err) => { console.error(err); alert("Erro ao importar o CSV."); } }); }); }
+function initCSVImport() { 
+  const input = document.getElementById("ordersCsvFile"); 
+  if (!input) return; 
+  input.addEventListener("change", async function (e) { 
+    const file = e.target.files[0]; 
+    if (!file) return; 
+    Papa.parse(file, { 
+      header: true, 
+      skipEmptyLines: true, 
+      complete: async (res) => { 
+        try { 
+          const novosPedidos = agruparPedidosPorOS(res.data || []); 
+          pedidos.push(...novosPedidos);
+          await salvarPedidosNoBackend(novosPedidos);
+          renderPedidosSeparados(); 
+          renderOperacaoLeveList(); 
+          renderCentral();
+          atualizarMetricas(); 
+          alert(`${novosPedidos.length} pedidos importados e salvos no backend.`); 
+        } catch (err) { 
+          console.error(err); 
+          alert("Erro ao processar os pedidos."); 
+        } 
+        e.target.value = ""; 
+      }, 
+      error: (err) => { 
+        console.error(err); 
+        alert("Erro ao importar o CSV."); 
+      } 
+    }); 
+  }); 
+}
 
 // ==================== INICIALIZAÇÃO ====================
-document.addEventListener("DOMContentLoaded", () => { 
+document.addEventListener("DOMContentLoaded", async () => { 
   carregarCorredoresDaUI();
   loadLocalCaches(); 
-  carregarDoStorageLocal(); 
+  await carregarVeiculosDoBackend();
+  await carregarPedidosDoBackend();
   renderVehicles(); 
   renderPedidosSeparados(); 
   renderOperacaoLeveList();
