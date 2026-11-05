@@ -86,21 +86,7 @@ $('previewmesa').onclick=async()=>{
  if(missing.length)throw Error('Colunas ausentes: '+missing.join(', ')+'. Encontradas: '+Object.keys(rawRows[0]).join(', '));
  const competencia=month($('importmes').value);
  if(!/^\d{2}\/\d{4}$/.test(competencia)||Number(competencia.slice(0,2))<1||Number(competencia.slice(0,2))>12)throw Error('Informe a competência MM/AAAA.');
- const parseMonth=value=>{
-  if(value===null||value===undefined||String(value).trim()==='')return '';
-  const v=String(value).trim();
-  // Excel armazena datas como números seriais (ex.: 46296 = 01/10/2026).
-  if(/^\d{4,6}(?:\.0+)?$/.test(v)){
-   const serial=Number(v);
-   if(serial>=20000&&serial<=100000){const date=new Date(Date.UTC(1899,11,30)+Math.floor(serial)*86400000);return String(date.getUTCMonth()+1).padStart(2,'0')+'/'+date.getUTCFullYear();}
-  }
-  const d=v.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
-  if(d)return d[2].padStart(2,'0')+'/'+(d[3].length===2?'20'+d[3]:d[3]);
-  const iso=v.match(/^(\d{4})-(\d{2})-(\d{2})/);
-  if(iso)return iso[2]+'/'+iso[1];
-  return month(v);
- };
- if(rows.some(row=>row['Mês'] && parseMonth(row['Mês'])!==competencia))throw Error('Arquivo contém meses diferentes da competência informada.');
+ // A competência selecionada no sistema prevalece sobre qualquer data da planilha.
  if(rows.some(row=>!String(row['NF ou Manifesto']??'').trim()||!String(row.VEICULO??'').trim()||!String(row['Frete Fechado']??'').trim()))throw Error('Há linhas sem manifesto, veículo ou frete fechado.');
  stagedRows=rows.map(r=>({...r,'Mês':competencia,mes:competencia}));stagedName=file.name;
  $('importpreview').textContent='Pronto para importar: '+num(rows.length)+' linhas · '+competencia+' · '+file.name+'. Registros já existentes serão preservados.';
