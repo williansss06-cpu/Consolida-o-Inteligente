@@ -69,30 +69,34 @@ $('previewmesa').onclick=async()=>{
  const file=$('importfile').files[0];if(!file)throw Error('Selecione um arquivo .xlsx ou .csv.');
  if(!window.XLSX)throw Error('Leitor Excel indisponível. Recarregue a página.');
  const book=XLSX.read(await file.arrayBuffer(),{type:'array',cellDates:false});
- const rows=XLSX.utils.sheet_to_json(book.Sheets[book.SheetNames[0]],{defval:'',raw:false});
- // Compatibilidade com a planilha operacional Fechamento Mensal x ANTT.
- // Nunca alterar o arquivo de origem: apenas normalizar os campos em memória.
- for(const row of rows){
-  if(!String(row['NF ou Manifesto']??'').trim() && String(row['Manifesto']??'').trim())row['NF ou Manifesto']=row['Manifesto'];
-  if(!String(row['NF ou Manifesto']??'').trim() && String(row['MANIFESTO']??'').trim())row['NF ou Manifesto']=row['MANIFESTO'];
-  if(!String(row['Frete Fechado']??'').trim() && String(row['FRETE FECHADO']??'').trim())row['Frete Fechado']=row['FRETE FECHADO'];
-  if(!String(row['Maior Custo']??'').trim() && String(row['MAIOR CUSTO']??'').trim())row['Maior Custo']=row['MAIOR CUSTO'];
-  if(!String(row['VEICULO']??'').trim() && String(row['Veículo']??'').trim())row['VEICULO']=row['Veículo'];
-  if(row['Mês']){
-   const original=String(row['Mês']).trim();
-   const parts=original.split('/');
-   if(parts.length===3 && parts[2].length===4 && parts.every(p=>p.trim()!=='' && Number.isFinite(Number(p))))row['Mês']=parts[1].padStart(2,'0')+'/'+parts[2];
-   else if(original.length>=10 && original[4]==='-' && original[7]==='-')row['Mês']=original.slice(5,7)+'/'+original.slice(0,4);
+ const rawRows=XLSX.utils.sheet_to_json(book.Sheets[book.SheetNames[0]],{defval:'',raw:false});
+ if(!rawRows.length||rawRows.length>2000)throw Error('O arquivo deve conter entre 1 e 2000 linhas.');
+ const canonical={'nf ou manifesto':'NF ou Manifesto','manifesto':'NF ou Manifesto','veiculo':'VEICULO','frete fechado':'Frete Fechado','maior custo':'Maior Custo','mes':'Mês'};
+ const normalizedKey=v=>String(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().replace(/\\s+/g,' ').toLowerCase();
+ const rows=rawRows.map(original=>{
+  const row={...original};
+  for(const [key,value] of Object.entries(original)){
+   const dest=canonical[normalizedKey(key)];
+   if(dest && !String(row[dest]??'').trim())row[dest]=value;
   }
- }
- if(!rows.length||rows.length>2000)throw Error('O arquivo deve conter entre 1 e 2000 linhas.');
+  return row;
+ });
  const required=['NF ou Manifesto','VEICULO','Frete Fechado','Maior Custo'];
- const headers=Object.keys(rows[0]);const missing=required.filter(h=>!headers.includes(h));
- if(missing.length)throw Error('Colunas ausentes: '+missing.join(', '));
+ const missing=required.filter(h=>!rows.some(row=>Object.prototype.hasOwnProperty.call(row,h)));
+ if(missing.length)throw Error('Colunas ausentes: '+missing.join(', ')+'. Encontradas: '+Object.keys(rawRows[0]).join(', '));
  const competencia=month($('importmes').value);
- if(!/^\d{2}\/\d{4}$/.test(competencia)||Number(competencia.slice(0,2))<1||Number(competencia.slice(0,2))>12)throw Error('Informe a competência MM/AAAA.');
- if(rows.some(r=>r['Mês']&&month(r['Mês'])!==competencia))throw Error('Arquivo contém meses diferentes da competência informada.');
- if(rows.some(r=>!String(r['NF ou Manifesto']).trim()||!String(r.VEICULO).trim()||!String(r['Frete Fechado']).trim()))throw Error('Há linhas sem manifesto, veículo ou frete fechado.');
+ if(!/^\\d{2}\\/\\d{4}$/.test(competencia)||Number(competencia.slice(0,2))<1||Number(competencia.slice(0,2))>12)throw Error('Informe a competência MM/AAAA.');
+ const parseMonth=value=>{
+  if(value===null||value===undefined||String(value).trim()==='')return '';
+  const v=String(value).trim();
+  const d=v.match(/^(\\d{1,2})\\/(\\d{1,2})\\/(\\d{2,4})$/);
+  if(d)return d[2].padStart(2,'0')+'/'+(d[3].length===2?'20'+d[3]:d[3]);
+  const iso=v.match(/^(\\d{4})-(\\d{2})-(\\d{2})/);
+  if(iso)return iso[2]+'/'+iso[1];
+  return month(v);
+ };
+ if(rows.some(row=>row['Mês'] && parseMonth(row['Mês'])!==competencia))throw Error('Arquivo contém meses diferentes da competência informada.');
+ if(rows.some(row=>!String(row['NF ou Manifesto']??'').trim()||!String(row.VEICULO??'').trim()||!String(row['Frete Fechado']??'').trim()))throw Error('Há linhas sem manifesto, veículo ou frete fechado.');
  stagedRows=rows.map(r=>({...r,'Mês':competencia,mes:competencia}));stagedName=file.name;
  $('importpreview').textContent='Pronto para importar: '+num(rows.length)+' linhas · '+competencia+' · '+file.name+'. Registros já existentes serão preservados.';
  $('confirmmesa').disabled=false;
