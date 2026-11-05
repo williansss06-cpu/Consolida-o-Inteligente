@@ -70,6 +70,21 @@ $('previewmesa').onclick=async()=>{
  if(!window.XLSX)throw Error('Leitor Excel indisponível. Recarregue a página.');
  const book=XLSX.read(await file.arrayBuffer(),{type:'array',cellDates:false});
  const rows=XLSX.utils.sheet_to_json(book.Sheets[book.SheetNames[0]],{defval:'',raw:false});
+ // Compatibilidade com a planilha operacional Fechamento Mensal x ANTT.
+ // Nunca alterar o arquivo de origem: apenas normalizar os campos em memória.
+ for(const row of rows){
+  if(!String(row['NF ou Manifesto']??'').trim() && String(row['Manifesto']??'').trim())row['NF ou Manifesto']=row['Manifesto'];
+  if(!String(row['NF ou Manifesto']??'').trim() && String(row['MANIFESTO']??'').trim())row['NF ou Manifesto']=row['MANIFESTO'];
+  if(!String(row['Frete Fechado']??'').trim() && String(row['FRETE FECHADO']??'').trim())row['Frete Fechado']=row['FRETE FECHADO'];
+  if(!String(row['Maior Custo']??'').trim() && String(row['MAIOR CUSTO']??'').trim())row['Maior Custo']=row['MAIOR CUSTO'];
+  if(!String(row['VEICULO']??'').trim() && String(row['Veículo']??'').trim())row['VEICULO']=row['Veículo'];
+  if(row['Mês']){
+   const original=String(row['Mês']).trim();
+   const match=original.match(/^(\\d{1,2})\\/(\\d{1,2})\\/(\\d{4})$/);
+   if(match)row['Mês']=match[2].padStart(2,'0')+'/'+match[3];
+   else if(/^\\d{4}-\\d{2}-\\d{2}/.test(original))row['Mês']=original.slice(5,7)+'/'+original.slice(0,4);
+  }
+ }
  if(!rows.length||rows.length>2000)throw Error('O arquivo deve conter entre 1 e 2000 linhas.');
  const required=['NF ou Manifesto','VEICULO','Frete Fechado','Maior Custo'];
  const headers=Object.keys(rows[0]);const missing=required.filter(h=>!headers.includes(h));
