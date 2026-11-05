@@ -80,9 +80,9 @@ $('previewmesa').onclick=async()=>{
   if(!String(row['VEICULO']??'').trim() && String(row['Veículo']??'').trim())row['VEICULO']=row['Veículo'];
   if(row['Mês']){
    const original=String(row['Mês']).trim();
-   const match=original.match(/^(\\d{1,2})\\/(\\d{1,2})\\/(\\d{4})$/);
-   if(match)row['Mês']=match[2].padStart(2,'0')+'/'+match[3];
-   else if(/^\\d{4}-\\d{2}-\\d{2}/.test(original))row['Mês']=original.slice(5,7)+'/'+original.slice(0,4);
+   const parts=original.split('/');
+   if(parts.length===3 && parts[2].length===4 && parts.every(p=>p.trim()!=='' && Number.isFinite(Number(p))))row['Mês']=parts[1].padStart(2,'0')+'/'+parts[2];
+   else if(original.length>=10 && original[4]==='-' && original[7]==='-')row['Mês']=original.slice(5,7)+'/'+original.slice(0,4);
   }
  }
  if(!rows.length||rows.length>2000)throw Error('O arquivo deve conter entre 1 e 2000 linhas.');
