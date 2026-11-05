@@ -89,6 +89,11 @@ $('previewmesa').onclick=async()=>{
  const parseMonth=value=>{
   if(value===null||value===undefined||String(value).trim()==='')return '';
   const v=String(value).trim();
+  // Excel armazena datas como números seriais (ex.: 46296 = 01/10/2026).
+  if(/^\d{4,6}(?:\.0+)?$/.test(v)){
+   const serial=Number(v);
+   if(serial>=20000&&serial<=100000){const date=new Date(Date.UTC(1899,11,30)+Math.floor(serial)*86400000);return String(date.getUTCMonth()+1).padStart(2,'0')+'/'+date.getUTCFullYear();}
+  }
   const d=v.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
   if(d)return d[2].padStart(2,'0')+'/'+(d[3].length===2?'20'+d[3]:d[3]);
   const iso=v.match(/^(\d{4})-(\d{2})-(\d{2})/);
