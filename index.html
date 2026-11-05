@@ -10,7 +10,8 @@ async function mesaRequest(method='GET',action='',body=null){
  const json=await response.json();if(!response.ok||!json.sucesso)throw Error(json.erro||('Falha na integração (HTTP '+response.status+')'));
  return json;
 }
-</script></head><body><header><div class="wrap"><div><h1>MUNDIAL LOGISTICS <span style="color:#4bb8f2">| Mesa de Fretes</span></h1><div class="sub">Indicador financeiro executivo · Contratação x maior cotação de transportadoras</div></div><div class="pill" id="source">Aguardando dados</div></div></header><main class="wrap">
+</script><!-- GitHub Pages: republicacao controlada do painel Mesa de Fretes, 2026-11-05 -->
+</head><body><header><div class="wrap"><div><h1>MUNDIAL LOGISTICS <span style="color:#4bb8f2">| Mesa de Fretes</span></h1><div class="sub">Indicador financeiro executivo · Contratação x maior cotação de transportadoras</div></div><div class="pill" id="source">Aguardando dados</div></div></header><main class="wrap">
 <section class="control-panel">
 <div class="panel-heading"><div><h2 class="section-title">Filtros dos indicadores</h2><p class="note">Selecione a competência e refine os resultados da operação.</p></div><div class="panel-actions"><button id="atualizar" type="button">Atualizar dados</button><button class="secondary" id="exportar" type="button">Exportar CSV</button></div></div>
 <div class="filters filter-grid">
