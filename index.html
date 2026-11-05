@@ -72,7 +72,7 @@ $('previewmesa').onclick=async()=>{
  const rawRows=XLSX.utils.sheet_to_json(book.Sheets[book.SheetNames[0]],{defval:'',raw:false});
  if(!rawRows.length||rawRows.length>2000)throw Error('O arquivo deve conter entre 1 e 2000 linhas.');
  const canonical={'nf ou manifesto':'NF ou Manifesto','manifesto':'NF ou Manifesto','veiculo':'VEICULO','frete fechado':'Frete Fechado','maior custo':'Maior Custo','mes':'Mês'};
- const normalizedKey=v=>String(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().replace(/\\s+/g,' ').toLowerCase();
+ const normalizedKey=v=>String(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().replace(/\s+/g,' ').toLowerCase();
  const rows=rawRows.map(original=>{
   const row={...original};
   for(const [key,value] of Object.entries(original)){
@@ -85,13 +85,13 @@ $('previewmesa').onclick=async()=>{
  const missing=required.filter(h=>!rows.some(row=>Object.prototype.hasOwnProperty.call(row,h)));
  if(missing.length)throw Error('Colunas ausentes: '+missing.join(', ')+'. Encontradas: '+Object.keys(rawRows[0]).join(', '));
  const competencia=month($('importmes').value);
- if(!/^\\d{2}\\/\\d{4}$/.test(competencia)||Number(competencia.slice(0,2))<1||Number(competencia.slice(0,2))>12)throw Error('Informe a competência MM/AAAA.');
+ if(!/^\d{2}\/\d{4}$/.test(competencia)||Number(competencia.slice(0,2))<1||Number(competencia.slice(0,2))>12)throw Error('Informe a competência MM/AAAA.');
  const parseMonth=value=>{
   if(value===null||value===undefined||String(value).trim()==='')return '';
   const v=String(value).trim();
-  const d=v.match(/^(\\d{1,2})\\/(\\d{1,2})\\/(\\d{2,4})$/);
+  const d=v.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
   if(d)return d[2].padStart(2,'0')+'/'+(d[3].length===2?'20'+d[3]:d[3]);
-  const iso=v.match(/^(\\d{4})-(\\d{2})-(\\d{2})/);
+  const iso=v.match(/^(\d{4})-(\d{2})-(\d{2})/);
   if(iso)return iso[2]+'/'+iso[1];
   return month(v);
  };
